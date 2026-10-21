@@ -1,0 +1,50 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="theme-color" content="#141414"><meta name="description" content="A local two-source video mixer.">
+  <title>MIST — video mixer</title>
+  <link rel="icon" href="/favicon.svg" type="image/svg+xml"><link rel="stylesheet" href="/style.css">
+</head>
+<body>
+  <main>
+    <section class="mixer-section" aria-label="Video control matrix" id="drop-zone">
+      <div class="matrix-toolbar"><span id="source-count" class="source-count">0 / 2 SOURCES</span><button id="reset-all" class="reset-button" title="Reset all source and master effects and output mapping">RESET</button></div>
+      <input id="file-input" type="file" accept="video/*,.mkv,.mov,.webm,.mp4,.m4v,.ogv" multiple hidden>
+      <input id="replace-input" type="file" accept="video/*,.mkv,.mov,.webm,.mp4,.m4v,.ogv" hidden>
+      <div class="matrix-scroll" tabindex="0" aria-label="Scrollable parameter matrix">
+        <div class="matrix" id="matrix">
+          <div class="matrix-columns" id="column-headings"><div class="source-column-label"><span>SOURCE</span><button id="empty-add" class="add-source" aria-label="Add videos" title="Add videos">+</button></div></div>
+          <div id="source-rows"></div>
+          <div id="master-row"></div>
+        </div>
+      </div>
+    </section>
+    <aside class="monitor-section" aria-label="Mix output and configuration">
+      <div class="monitor-shell" id="monitor-shell">
+        <div id="mapping-surface" class="mapping-surface">
+          <canvas id="output" width="1280" height="720" aria-label="Combined video output"></canvas>
+          <div id="mapping-overlay" class="mapping-overlay" hidden>
+            <svg viewBox="0 0 100 100" preserveAspectRatio="none" aria-hidden="true"><polygon id="mapping-outline" points="0,0 100,0 100,100 0,100"/></svg>
+            <button class="mapping-handle" data-corner="0" aria-label="Map top left corner" title="Drag to map top left; double-click to reset"></button>
+            <button class="mapping-handle" data-corner="1" aria-label="Map top right corner" title="Drag to map top right; double-click to reset"></button>
+            <button class="mapping-handle" data-corner="2" aria-label="Map bottom right corner" title="Drag to map bottom right; double-click to reset"></button>
+            <button class="mapping-handle" data-corner="3" aria-label="Map bottom left corner" title="Drag to map bottom left; double-click to reset"></button>
+          </div>
+        </div>
+      </div>
+      <div class="output-panel">
+        <div class="mapping-settings"><label><input id="mapping-toggle" type="checkbox"> MAPPING</label><button id="reset-mapping" class="reset-button" aria-label="Reset mapping" title="Restore all four mapping corners">RESET</button></div>
+        <div class="output-settings">
+          <label for="resolution">Resolution <select id="resolution"><option value="360">640 × 360</option><option value="540">960 × 540</option><option value="720" selected>1280 × 720</option><option value="1080">1920 × 1080</option></select></label>
+          <button id="open-output" class="button output-button">Open clean output <span aria-hidden="true">↗</span></button>
+        </div>
+        <span class="signal-label" id="signal-label">NO SIGNAL</span>
+        <div class="performance"><span class="live-dot" id="performance-dot"></span><span id="fps">0</span><span>FPS</span><span class="performance-separator">/</span><span id="dropped">0</span><span>DECODE DROPS</span></div>
+      </div>
+    </aside>
+    <div id="messages" class="messages" aria-live="polite"></div>
+  </main>
+  <script type="module" src="/src/app.js"></script>
+</body>
+</html>
