@@ -105,7 +105,7 @@ test('two-file lifecycle, knob interactions, replacement, and clean output', asy
   const hue = first.getByRole('slider').nth(10); await hue.focus(); await hue.press('ArrowUp'); await expect(hue).toHaveAttribute('aria-valuenow', '1'); await hue.dblclick(); await expect(hue).toHaveAttribute('aria-valuenow', '0');
   const opacity = first.getByRole('slider').first(); await opacity.scrollIntoViewIfNeeded(); const bounds = await opacity.boundingBox(); await page.mouse.move(bounds.x + 20, bounds.y + 20); await page.mouse.down(); await page.mouse.move(bounds.x + 20, bounds.y + 60); await page.mouse.up(); await expect(opacity).toHaveAttribute('aria-valuenow', '0.75');
   await first.getByRole('button', { name: 'Pause video', exact: true }).click(); await expect(first.locator('small')).toContainText('PAUSED');
-  await expect(first.getByRole('button', { name: 'Back-and-forth playback', exact: true })).toHaveAttribute('aria-pressed', 'false');
+  await expect(first.getByRole('button', { name: 'Back-and-forth playback', exact: true })).toHaveCount(0);
   await first.getByRole('button', { name: 'Play video', exact: true }).click();
   await first.getByRole('button', { name: 'Move layer down', exact: true }).click(); await expect(page.locator('.source-row').first().locator('strong')).toHaveText('second.webm');
   const popupPromise = page.waitForEvent('popup'); await page.locator('#open-output').click(); const popup = await popupPromise;
@@ -124,7 +124,7 @@ test('two-file lifecycle, knob interactions, replacement, and clean output', asy
   await row.getByRole('button', { name: 'Reset source effects', exact: true }).click(); await expect(row.getByRole('slider').first()).toHaveAttribute('aria-valuenow', '0');
   await expect(page.locator('.source-row').nth(1).getByRole('slider').first()).toHaveAttribute('aria-valuenow', '0.75');
   await page.locator('#reset-all').click(); await expect(row.getByRole('slider').first()).toHaveAttribute('aria-valuenow', '0'); await expect(page.locator('.master').getByRole('slider').first()).toHaveAttribute('aria-valuenow', '1');
-  await row.getByRole('button', { name: 'Eject video', exact: true }).click(); await page.locator('.source-row').getByRole('button', { name: 'Eject video', exact: true }).click();
+  await row.getByRole('button', { name: 'Remove video', exact: true }).click(); await page.locator('.source-row').getByRole('button', { name: 'Remove video', exact: true }).click();
   await expect(page.locator('#empty-add')).toBeVisible(); await expect(page.locator('#empty-add')).toBeEnabled();
   expect(errors).toEqual([]);
 });
@@ -135,7 +135,7 @@ test('invalid video gives a recoverable error and compact layout remains usable'
   await expect(page.locator('.source-row small')).toHaveText('PLAYBACK ERROR');
   await expect(page.locator('.message').last()).toContainText('Try replacing');
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
-  await page.locator('.source-row').getByRole('button', { name: 'Eject video', exact: true }).click();
+  await page.locator('.source-row').getByRole('button', { name: 'Remove video', exact: true }).click();
   await expect(page.locator('#empty-add')).toBeVisible();
 });
 
@@ -259,7 +259,7 @@ test('fullscreen output keeps moving when the mixer window clocks are suspended'
   await popup.close();
 });
 
-test('optional previews, aligned master controls, eject and ping-pong transport', async ({ page }, testInfo) => {
+test('centered preview eyes, master controls and replacement through eject', async ({ page }, testInfo) => {
   const errors = []; page.on('pageerror', e => errors.push(e.message));
   await page.goto('/'); const fixture = await clip(page);
   await expect(page.locator('#signal-label')).toHaveText('X SIGNAL');
@@ -287,14 +287,29 @@ test('optional previews, aligned master controls, eject and ping-pong transport'
   times.forEach((time, i) => expect(Math.abs(pausedTimes[i] - time)).toBeLessThan(.02));
   await master.getByRole('button', { name: 'Resume all sources', exact: true }).click();
   await expect(first.locator('small')).toContainText('PLAYING'); await expect(second.locator('small')).toContainText('PAUSED');
-  const rewind = first.getByRole('button', { name: 'Back-and-forth playback', exact: true });
-  await expect(rewind).toHaveAttribute('aria-pressed', 'false'); await rewind.click();
-  await first.locator('video').evaluate(video => { video.currentTime = Math.max(0, video.duration - .08); });
-  await expect.poll(() => first.getAttribute('data-direction')).toBe('-1');
-  const reverseStart = await first.locator('video').evaluate(v => v.currentTime);
-  await expect.poll(() => first.locator('video').evaluate(v => v.currentTime)).toBeLessThan(reverseStart - .05);
-  await expect.poll(() => first.getAttribute('data-direction')).toBe('1');
-  await rewind.click(); await expect(rewind).toHaveAttribute('aria-pressed', 'false'); expect(await first.locator('video').evaluate(v => v.loop)).toBe(true);
+  await expect(first.getByRole('button', { name: 'Back-and-forth playback', exact: true })).toHaveCount(0);
+  expect(await first.locator('video').evaluate(v => v.loop)).toBe(true);
+  for (const [row, label] of [[first, 'Source preview'], [master, 'Master monitor']]) {
+    await expect(row.locator('.thumbnail').getByRole('button')).toHaveCount(1);
+    const tile = await row.locator('.thumbnail').boundingBox();
+    const eye = await row.getByRole('button', { name: label, exact: true }).locator('svg').boundingBox();
+    expect(Math.abs((eye.x + eye.width / 2) - (tile.x + tile.width / 2))).toBeLessThan(1);
+    expect(Math.abs((eye.y + eye.height / 2) - (tile.y + tile.height / 2))).toBeLessThan(1);
+  }
+  await setValue(first, 0, 80);
+  await first.getByRole('button', { name: 'Source preview', exact: true }).click();
+  const originalId = await first.getAttribute('data-source');
+  const cancelPicker = page.waitForEvent('filechooser'); await first.getByRole('button', { name: 'Eject / replace video', exact: true }).click();
+  await (await cancelPicker).setFiles([]);
+  await expect(page.locator('.source-row')).toHaveCount(2); await expect(first.locator('strong')).toHaveText('test-pattern.webm');
+  expect(await first.getAttribute('data-source')).toBe(originalId);
+  const replacePicker = page.waitForEvent('filechooser'); await first.getByRole('button', { name: 'Eject / replace video', exact: true }).click();
+  await (await replacePicker).setFiles({ ...fixture, name: 'replacement-through-eject.webm' });
+  await expect(first.locator('strong')).toHaveText('replacement-through-eject.webm'); await expect(first.locator('small')).toContainText('PLAYING');
+  await expect(page.locator('.source-row')).toHaveCount(2); await expect(page.locator('#source-count')).toHaveText('2 / 2');
+  await expect(first.getByRole('slider').first()).toHaveAttribute('aria-valuenow', '0.8');
+  await expect(first.getByRole('button', { name: 'Source preview', exact: true })).toHaveAttribute('aria-pressed', 'true');
+  await expect(first.locator('video')).toBeVisible();
   await setValue(first, 0, 100);
   const popupPromise = page.waitForEvent('popup'); await page.locator('#open-output').click(); const popup = await popupPromise;
   await expect.poll(() => popup.locator('video').evaluate(v => v.readyState)).toBeGreaterThanOrEqual(2);
@@ -305,8 +320,8 @@ test('optional previews, aligned master controls, eject and ping-pong transport'
   await master.getByRole('button', { name: 'Master monitor', exact: true }).click(); await expect(page.locator('#output')).toHaveCSS('visibility', 'visible');
   await popup.close();
   await page.screenshot({ path: testInfo.outputPath('transport.png'), fullPage: true });
-  await first.getByRole('button', { name: 'Eject video', exact: true }).click(); await expect(page.locator('.source-row')).toHaveCount(1);
+  await first.getByRole('button', { name: 'Remove video', exact: true }).click(); await expect(page.locator('.source-row')).toHaveCount(1);
   await expect(page.locator('.source-column-label #source-count')).toHaveText('1 / 2');
-  await page.locator('.source-row').getByRole('button', { name: 'Eject video', exact: true }).click(); await expect(page.locator('#signal-label')).toHaveText('X SIGNAL');
+  await page.locator('.source-row').getByRole('button', { name: 'Remove video', exact: true }).click(); await expect(page.locator('#signal-label')).toHaveText('X SIGNAL');
   expect(errors).toEqual([]);
 });

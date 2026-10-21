@@ -85,11 +85,10 @@ function knob(parameter, owner) {
 for (const p of PARAMETERS) {
   const label = document.createElement('div'); label.textContent = p.label; label.className = `parameter-label ${p.group || ''}`; $('#column-headings').append(label);
 }
-const monitorPlaceholder = document.createElement('div'); monitorPlaceholder.className = 'monitor-placeholder'; monitorPlaceholder.innerHTML = icon('funnel'); monitorPlaceholder.hidden = true; canvas.after(monitorPlaceholder);
+const monitorPlaceholder = document.createElement('div'); monitorPlaceholder.className = 'monitor-placeholder'; monitorPlaceholder.innerHTML = icon('eyeOff'); monitorPlaceholder.hidden = true; canvas.after(monitorPlaceholder);
 const masterRow = document.createElement('div'); masterRow.className = 'matrix-row master'; masterRow.dataset.source = 'master';
 const masterLabel = document.createElement('div'); masterLabel.className = 'source-cell';
 const masterThumb = document.createElement('div'); masterThumb.className = 'thumbnail master-thumbnail';
-masterThumb.innerHTML = `<span class="preview-placeholder">${icon('funnel')}</span>`;
 const masterEye = iconButton('eye', 'Master monitor', () => {
   master.preview = !master.preview; updateMaster(); updateMapping(); renderDirty = true;
 });
@@ -163,8 +162,6 @@ function iconButton(name, label, action) {
 }
 function updateSourcePreview(source) {
   source.video.hidden = !source.preview;
-  source.placeholder.hidden = source.preview;
-  source.placeholder.innerHTML = icon(source.transport.paused ? 'play' : 'pause');
   setIcon(source.eye, source.preview ? 'eye' : 'eyeOff'); source.eye.setAttribute('aria-pressed', source.preview);
   source.eye.title = source.preview ? 'Hide source preview' : 'Show source preview';
 }
@@ -200,7 +197,6 @@ function createSource(file, existing = null) {
   const cell = document.createElement('div'); cell.className = 'source-cell';
   const thumb = document.createElement('div'); thumb.className = 'thumbnail'; thumb.append(video);
   const togglePlayback = () => { if (source.transport.paused) play(source); else source.transport.pause(); };
-  const placeholder = sourceButton('', 'Toggle source playback', togglePlayback); placeholder.className = 'preview-placeholder'; source.placeholder = placeholder; thumb.append(placeholder);
   source.eye = iconButton('eyeOff', 'Source preview', () => { source.preview = !source.preview; updateSourcePreview(source); }); source.eye.classList.add('preview-eye'); thumb.append(source.eye);
   const badge = document.createElement('span'); badge.className = 'source-badge'; badge.textContent = String(number).padStart(2, '0'); thumb.append(badge);
   const details = document.createElement('div'); details.className = 'source-details';
@@ -209,27 +205,23 @@ function createSource(file, existing = null) {
   const status = document.createElement('small'); status.textContent = 'LOADING…'; source.status = status;
   const transport = document.createElement('div'); transport.className = 'transport';
   const playButton = iconButton('pause', 'Pause video', togglePlayback); source.playButton = playButton;
-  const eject = iconButton('eject', 'Eject video', () => removeSource(source));
-  const rewind = iconButton('rewind', 'Back-and-forth playback', () => source.transport.setPingPong(!source.transport.pingPong));
+  const eject = iconButton('eject', 'Eject / replace video', () => { replacementId = source.id; $('#replace-input').click(); });
   const resetSource = sourceButton('RESET', 'Reset source effects', () => reset(source)); resetSource.className = 'reset-button';
-  transport.append(playButton, eject, rewind, resetSource); details.append(nameButton, status, transport);
+  transport.append(playButton, eject, resetSource); details.append(nameButton, status, transport);
   const operations = document.createElement('div'); operations.className = 'row-operations';
   const move = amount => { const index = sources.indexOf(source), to = index + amount; if (to < 0 || to >= sources.length) return; [sources[index], sources[to]] = [sources[to], sources[index]]; updateRows(); };
   source.up = sourceButton('↑', 'Move layer up', () => move(-1)); source.down = sourceButton('↓', 'Move layer down', () => move(1));
-  operations.append(source.up, source.down);
+  operations.append(source.up, source.down, sourceButton('×', 'Remove video', () => removeSource(source)));
   cell.append(thumb, details, operations); row.append(cell, ...PARAMETERS.map(p => knob(p, source)));
   source.updateStatus = () => {
     if (source.error || source.removed) return;
     const paused = source.transport.paused;
     status.textContent = `${video.videoWidth}×${video.videoHeight} · ${paused ? 'PAUSED' : 'PLAYING'}`;
-    row.dataset.direction = String(source.transport.direction);
     setIcon(playButton, paused ? 'play' : 'pause', paused ? 'Play video' : 'Pause video');
-    playButton.disabled = master.paused; placeholder.disabled = master.paused;
-    rewind.classList.toggle('enabled', source.transport.pingPong); rewind.setAttribute('aria-pressed', source.transport.pingPong);
+    playButton.disabled = master.paused;
     updateSourcePreview(source); renderDirty = true; updateMonitor();
   };
-  if (existing?.transport.pingPong) source.transport.setPingPong(true);
-  rewind.setAttribute('aria-pressed', source.transport.pingPong); updateSourcePreview(source);
+  updateSourcePreview(source);
   video.addEventListener('loadeddata', () => { if (source.removed) return; clearTimeout(source.loadTimeout); source.dirty = true; source.updateStatus(); play(source); });
   video.addEventListener('error', () => { clearTimeout(source.loadTimeout); sourceError(source, 'Unsupported codec, damaged file, or decoding failure.'); });
   for (const event of ['play', 'pause', 'ended', 'seeked']) video.addEventListener(event, source.updateStatus);
@@ -296,7 +288,6 @@ function renderFrame(now, fromOutput = false) {
   if (disposed) return;
   // Leave the compositor at 30 Hz even on high-refresh-rate displays.
   if (now - lastRender < 1000 / 30 - 1) return;
-  for (const source of sources) if (!source.error) source.transport.update(now);
   const playing = sources.some(s => !s.error && !s.transport.paused && s.values.opacity > 0);
   if (document.hidden && !fromOutput) return;
   if (renderer && (master.preview || (outputWindow && !outputWindow.closed)) && (renderDirty || playing || sources.some(s => s.dirty && s.values.opacity > 0))) {
