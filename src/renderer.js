@@ -1,4 +1,4 @@
-import { inverseMapping } from './mapping.js';
+import { inverseMapping, identityCorners } from './mapping.js';
 
 const vertex = `#version 300 es
 in vec2 position;
@@ -75,7 +75,7 @@ export class Renderer {
     gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([-1, -1, 3, -1, -1, 3]), gl.STATIC_DRAW);
     const location = gl.getAttribLocation(this.program, 'position'); gl.enableVertexAttribArray(location); gl.vertexAttribPointer(location, 2, gl.FLOAT, false, 0, 0);
     this.uniforms = Object.fromEntries(['image', 'sourceSize', 'outputSize', 'master', 'opacity', 'mirrorX', 'mirrorY', 'pixelation', 'colorMatrix', 'colorOffset', 'mappingEnabled', 'mappingMatrix'].map(key => [key, gl.getUniformLocation(this.program, key)]));
-    this.mappingCache = null; this.colorCache = new WeakMap(); this.uploadCanvases = new Map(); this.textures = new Map(); this.target = this.makeTexture(); this.framebuffer = gl.createFramebuffer();
+    this.mappingCache = null; this.colorCache = new WeakMap(); this.uploadCanvases = new Map(); this.uploadedTimes = new Map(); this.textures = new Map(); this.target = this.makeTexture(); this.framebuffer = gl.createFramebuffer();
     this.resize(this.canvas.width, this.canvas.height);
   }
   makeTexture() {
@@ -95,7 +95,7 @@ export class Renderer {
     if (gl.checkFramebufferStatus(gl.FRAMEBUFFER) !== gl.FRAMEBUFFER_COMPLETE) throw new Error('Not enough graphics resources for this output size. Try 720p.');
     gl.bindFramebuffer(gl.FRAMEBUFFER, null);
   }
-  remove(id) { const texture = this.textures.get(id); if (texture && !this.lost) this.gl.deleteTexture(texture); this.textures.delete(id); this.uploadCanvases.delete(id); }
+  remove(id) { const texture = this.textures.get(id); if (texture && !this.lost) this.gl.deleteTexture(texture); this.textures.delete(id); this.uploadCanvases.delete(id); this.uploadedTimes.delete(id); }
   draw(texture, size, values, master = false) {
     const gl = this.gl;
     gl.bindTexture(gl.TEXTURE_2D, texture);
@@ -135,7 +135,7 @@ export class Renderer {
     gl.useProgram(this.program); gl.bindVertexArray(this.vao); gl.activeTexture(gl.TEXTURE0); gl.uniform1i(this.uniforms.image, 0);
     gl.viewport(0, 0, width, height); gl.uniform2f(this.uniforms.outputSize, width, height);
     let transform = null;
-    if (mapping?.enabled) {
+    if (mapping?.points && !identityCorners(mapping.points)) {
       const signature = mapping.points.flat().join(',');
       if (this.mappingCache?.signature !== signature) this.mappingCache = { signature, matrix: inverseMapping(mapping.points) };
       transform = this.mappingCache.matrix;
@@ -144,13 +144,15 @@ export class Renderer {
     if (transform) gl.uniformMatrix3fv(this.uniforms.mappingMatrix, false, transform);
     const direct = this.isNeutral(master) && !transform;
     gl.bindFramebuffer(gl.FRAMEBUFFER, direct ? null : this.framebuffer); gl.clearColor(0, 0, 0, 1); gl.clear(gl.COLOR_BUFFER_BIT);
-    gl.enable(gl.BLEND); gl.blendFunc(gl.ONE, gl.ONE_MINUS_SRC_ALPHA);
+    // Screen blend: C = source * opacity + destination * (1 - source * opacity).
+    // Keep the framebuffer opaque; a fully visible source never replaces the mix.
+    gl.enable(gl.BLEND); gl.blendFuncSeparate(gl.ONE, gl.ONE_MINUS_SRC_COLOR, gl.ZERO, gl.ONE);
     for (const source of sources) {
       if (source.error || source.values.opacity === 0 || source.video.readyState < 2 || !source.video.videoWidth) continue;
       let texture = this.textures.get(source.id);
       const fresh = !texture;
       if (!texture) { texture = this.makeTexture(); this.textures.set(source.id, texture); }
-      if (source.dirty || fresh) {
+      if (source.dirty || fresh || source.video.currentTime !== this.uploadedTimes.get(source.id)) {
         gl.bindTexture(gl.TEXTURE_2D, texture); gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, true);
         try {
           // Upload no more pixels than the output can display. This matters on software WebGL.
@@ -165,7 +167,7 @@ export class Renderer {
             staging.context.clearRect(0, 0, staging.canvas.width, staging.canvas.height);
             staging.context.drawImage(source.video, 0, 0, staging.canvas.width, staging.canvas.height); upload = staging.canvas;
           }
-          gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, upload); source.dirty = false;
+          gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, upload); source.dirty = false; this.uploadedTimes.set(source.id, source.video.currentTime);
         }
         catch (error) { source.onRenderError?.(error); continue; }
       }

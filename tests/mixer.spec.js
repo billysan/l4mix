@@ -44,6 +44,9 @@ test('real shader preserves orientation, mixes opacity, processes effects and re
     blue.values.opacity = 0; results.zero = render([red, blue]);
     blue.values.opacity = 1; results.full = render([red, blue]);
     results.reorder = render([blue, red]);
+    const gray = image('gray', solid('#808080')), gray2 = image('gray2', solid('#808080'));
+    results.screenGray = render([gray, gray2]); gray2.values.opacity = .5; results.screenHalfGray = render([gray, gray2]);
+    results.blackOverlay = render([red, image('black', solid('#000000'))]);
     results.masterInvert = render([red], { ...master, inversion: 1 });
     results.masterFade = render([red], { ...master, opacity: .5 });
     red.values.red = 0; results.redGain = render([red]); red.values.red = 1;
@@ -55,11 +58,11 @@ test('real shader preserves orientation, mixes opacity, processes effects and re
     r.render([pattern], master); results.topLeft = pixel(1,6); results.bottomLeft = pixel(1,1);
     pattern.values.mirrorX = 2; pattern.values.mirrorY = 2; r.render([pattern], master); results.cloneLeft = pixel(0,7); results.cloneNext = pixel(4,7); results.cloneRight = pixel(3,7); results.cloneRightNext = pixel(7,7); results.cloneBottom = pixel(0,3);
     pattern.values.mirrorX = pattern.values.mirrorY = 1; pattern.values.pixelation = 8; r.render([pattern], master); results.pixelA = pixel(1,1); results.pixelB = pixel(6,6);
-    r.render([red], { ...master, inversion: 1 }, { enabled: true, points: [[.25,.25],[.75,.25],[.75,.75],[.25,.75]] });
+    r.render([red], { ...master, inversion: 1 }, { editing: true, points: [[.25,.25],[.75,.25],[.75,.75],[.25,.75]] });
     results.mappedCenter = pixel(4,4); results.mappedOutside = pixel(0,0);
     pattern.values.pixelation = 1;
-    r.render([pattern], master, { enabled: true, points: [[0,0],[1,0],[1,1],[0,1]] }); results.mappedIdentity = pixel(1,6);
-    r.render([red], master, { enabled: false, points: [[.25,.25],[.75,.25],[.75,.75],[.25,.75]] }); results.disabledMapping = pixel(0,0);
+    r.render([pattern], master, { editing: true, points: [[0,0],[1,0],[1,1],[0,1]] }); results.mappedIdentity = pixel(1,6);
+    r.render([red], master, { editing: false, points: [[.25,.25],[.75,.25],[.75,.75],[.25,.75]] }); results.retainedMapping = pixel(0,0);
     r.remove(red.id); results.textureRemoved = !r.textures.has(red.id);
     results.glError = r.gl.getError();
     const ext = r.gl.getExtension('WEBGL_lose_context');
@@ -71,13 +74,14 @@ test('real shader preserves orientation, mixes opacity, processes effects and re
     r.dispose(); return results;
   });
   const near = (actual, expected) => expected.forEach((v, i) => expect(Math.abs(actual[i] - v)).toBeLessThanOrEqual(2));
-  near(checks.identity, [255,0,0,255]); near(checks.half, [128,0,128,255]); near(checks.zero, [255,0,0,255]); near(checks.full, [0,0,255,255]); near(checks.reorder, [255,0,0,255]);
+  near(checks.identity, [255,0,0,255]); near(checks.half, [255,0,128,255]); near(checks.zero, [255,0,0,255]); near(checks.full, [255,0,255,255]); near(checks.reorder, [255,0,255,255]);
+  near(checks.screenGray, [192,192,192,255]); near(checks.screenHalfGray, [160,160,160,255]); near(checks.blackOverlay, [255,0,0,255]);
   near(checks.masterInvert, [0,255,255,255]); near(checks.masterFade, [128,0,0,255]); near(checks.redGain, [0,0,0,255]);
   near(checks.gray, [54,54,54,255]); near(checks.brightness, [128,0,0,255]); near(checks.contrast, [128,128,128,255]);
   expect(checks.hue[0]).toBeLessThan(3); expect(checks.hue[1]).toBeGreaterThan(100);
   near(checks.topLeft, [255,0,0,255]); near(checks.bottomLeft, [0,0,255,255]);
   near(checks.cloneLeft, [255,0,0,255]); near(checks.cloneLeft, checks.cloneNext); near(checks.cloneRight, [0,255,0,255]); near(checks.cloneRight, checks.cloneRightNext); near(checks.cloneLeft, checks.cloneBottom); near(checks.pixelA, checks.pixelB);
-  near(checks.mappedCenter, [0,255,255,255]); near(checks.mappedOutside, [0,0,0,255]); near(checks.mappedIdentity, [255,0,0,255]); near(checks.disabledMapping, [255,0,0,255]);
+  near(checks.mappedCenter, [0,255,255,255]); near(checks.mappedOutside, [0,0,0,255]); near(checks.mappedIdentity, [255,0,0,255]); near(checks.retainedMapping, [0,0,0,255]);
   expect(checks.textureRemoved).toBe(true); expect(checks.glError).toBe(0); near(checks.restored, [255,0,0,255]);
 });
 
@@ -99,7 +103,7 @@ test('two-file lifecycle, knob interactions, replacement, and clean output', asy
   await expect(page.locator('#signal-label')).toHaveText('SIGNAL ACTIVE');
   await page.screenshot({ path: testInfo.outputPath('mixer.png'), fullPage: true });
   const hue = first.getByRole('slider').nth(10); await hue.focus(); await hue.press('ArrowUp'); await expect(hue).toHaveAttribute('aria-valuenow', '1'); await hue.dblclick(); await expect(hue).toHaveAttribute('aria-valuenow', '0');
-  const opacity = first.getByRole('slider').first(); const bounds = await opacity.boundingBox(); await page.mouse.move(bounds.x + 20, bounds.y + 20); await page.mouse.down(); await page.mouse.move(bounds.x + 20, bounds.y + 60); await page.mouse.up(); await expect(opacity).toHaveAttribute('aria-valuenow', '0.75');
+  const opacity = first.getByRole('slider').first(); await opacity.scrollIntoViewIfNeeded(); const bounds = await opacity.boundingBox(); await page.mouse.move(bounds.x + 20, bounds.y + 20); await page.mouse.down(); await page.mouse.move(bounds.x + 20, bounds.y + 60); await page.mouse.up(); await expect(opacity).toHaveAttribute('aria-valuenow', '0.75');
   await first.getByRole('button', { name: 'Pause video', exact: true }).click(); await expect(first.locator('small')).toContainText('PAUSED');
   await first.getByRole('button', { name: 'Loop video', exact: true }).click(); await expect(first.getByRole('button', { name: 'Loop video', exact: true })).toHaveAttribute('aria-pressed', 'false');
   await first.getByRole('button', { name: 'Play video', exact: true }).click();
@@ -169,6 +173,8 @@ test('compact grayscale layout and four-corner output mapping', async ({ page },
   await expect(page.locator('.add-row')).toHaveCount(0);
   await expect(page.locator('.source-column-label').getByRole('button', { name: 'Add videos', exact: true })).toHaveText('+');
   await expect(page.locator('#reset-all')).toHaveText('RESET');
+  expect(await page.evaluate(() => Number(getComputedStyle(document.documentElement).zoom))).toBe(1.4);
+  await expect(page.locator('label[for=resolution]')).toContainText('RESOLUTION');
   const color = await page.locator('.knob').first().evaluate(el => getComputedStyle(el).borderColor);
   const rgb = color.match(/\d+/g).map(Number); expect(rgb[0]).toBe(rgb[1]); expect(rgb[1]).toBe(rgb[2]);
   const handles = page.locator('.mapping-handle'); await expect(handles.first()).toBeHidden();
@@ -187,8 +193,28 @@ test('compact grayscale layout and four-corner output mapping', async ({ page },
     return { outside: [...ctx.getImageData(2,2,1,1).data], center: [...ctx.getImageData(c.width/2,c.height/2,1,1).data] };
   });
   expect(pixels.outside.slice(0,3).every(v => v < 5)).toBe(true); expect(pixels.center.slice(0,3).some(v => v > 30)).toBe(true);
-  await expect(popup.locator('.mapping-handle')).toHaveCount(0); await popup.close();
+  await expect(popup.locator('.mapping-handle')).toHaveCount(0);
   await page.locator('#mapping-toggle').uncheck(); await expect(handles.first()).toBeHidden();
+  await expect(page.locator('#reset-mapping')).toBeEnabled();
+  // Hiding editing guides must retain the warped pixels in both destinations.
+  const monitorPixels = await page.evaluate(async () => {
+    const { Renderer } = await import('/src/renderer.js');
+    return new Promise(resolve => {
+      const original = Renderer.prototype.render;
+      Renderer.prototype.render = function (...args) {
+        const result = original.apply(this, args), corner = new Uint8Array(4), center = new Uint8Array(4);
+        this.gl.readPixels(2, this.canvas.height - 3, 1, 1, this.gl.RGBA, this.gl.UNSIGNED_BYTE, corner);
+        this.gl.readPixels(this.canvas.width / 2, this.canvas.height / 2, 1, 1, this.gl.RGBA, this.gl.UNSIGNED_BYTE, center);
+        Renderer.prototype.render = original; resolve({ corner: [...corner], center: [...center] }); return result;
+      };
+    });
+  });
+  expect(monitorPixels.corner.slice(0,3).every(v => v < 5)).toBe(true); expect(monitorPixels.center.slice(0,3).some(v => v > 30)).toBe(true);
+  await expect.poll(() => popup.locator('video').evaluate(video => {
+    const c = document.createElement('canvas'); c.width = video.videoWidth; c.height = video.videoHeight;
+    const ctx = c.getContext('2d'); ctx.drawImage(video, 0, 0); return [...ctx.getImageData(2,2,1,1).data].slice(0,3).every(v => v < 5);
+  })).toBe(true);
+  await popup.close();
   await page.locator('#mapping-toggle').check(); expect(await handles.first().evaluate(el => el.style.getPropertyValue('--x'))).toBe(moved[0]);
   await handles.first().focus(); await handles.first().press('ArrowRight');
   expect(parseFloat(await handles.first().evaluate(el => el.style.getPropertyValue('--x')))).toBeGreaterThan(parseFloat(moved[0]));
@@ -198,4 +224,37 @@ test('compact grayscale layout and four-corner output mapping', async ({ page },
   expect(await handles.first().evaluate(el => el.style.getPropertyValue('--x'))).toBe('0%');
   await expect(row.getByRole('slider').first()).toHaveAttribute('aria-valuenow', '0');
   expect(errors).toEqual([]);
+});
+
+test('fullscreen output keeps moving when the mixer window clocks are suspended', async ({ page }) => {
+  await page.addInitScript(() => {
+    const raf = window.requestAnimationFrame.bind(window), interval = window.setInterval.bind(window);
+    window.requestAnimationFrame = callback => raf(now => { if (!window.suspendMixerClocks) callback(now); });
+    window.setInterval = (callback, delay, ...args) => interval(() => { if (!window.suspendMixerClocks) callback(...args); }, delay);
+    const videoFrame = HTMLVideoElement.prototype.requestVideoFrameCallback;
+    if (videoFrame) HTMLVideoElement.prototype.requestVideoFrameCallback = function (callback) {
+      return videoFrame.call(this, (...args) => { if (!window.suspendMixerClocks) callback(...args); });
+    };
+  });
+  await page.goto('/'); const fixture = await clip(page);
+  await page.locator('#file-input').setInputFiles(fixture); await expect(page.locator('.source-row small')).toContainText('PLAYING');
+  await setValue(page.locator('.source-row'), 0, 100);
+  const popupPromise = page.waitForEvent('popup'); await page.locator('#open-output').click(); const popup = await popupPromise;
+  await expect.poll(() => popup.locator('video').evaluate(v => v.readyState)).toBeGreaterThanOrEqual(2);
+  await popup.getByRole('button', { name: 'Enter fullscreen' }).click();
+  await expect.poll(() => popup.evaluate(() => !!document.fullscreenElement)).toBe(true);
+  await page.evaluate(() => { window.suspendMixerClocks = true; Object.defineProperty(document, 'hidden', { configurable: true, get: () => true }); });
+  // Sample changing pixels, rather than media time (which can advance on a frozen picture).
+  const hashes = await popup.evaluate(async () => {
+    const video = document.querySelector('video'), c = document.createElement('canvas'); c.width = 64; c.height = 36;
+    const ctx = c.getContext('2d', { willReadFrequently: true }), hashes = [];
+    for (let i = 0; i < 10; i++) {
+      await new Promise(resolve => setTimeout(resolve, 100)); ctx.drawImage(video, 0, 0, 64, 36);
+      let hash = 2166136261; for (const v of ctx.getImageData(0, 0, 64, 36).data) hash = Math.imul(hash ^ v, 16777619);
+      hashes.push(hash >>> 0);
+    }
+    return hashes;
+  });
+  expect(new Set(hashes).size).toBeGreaterThan(2);
+  await popup.close();
 });

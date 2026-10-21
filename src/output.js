@@ -24,3 +24,14 @@ if (window.opener && !window.opener.closed) {
   try { window.opener.dispatchEvent(new CustomEvent('mist-output-ready', { detail: window })); }
   catch { error.hidden = false; error.textContent = 'Open this window using “Open clean output” in the mixer.'; }
 } else { error.hidden = false; error.textContent = 'Open this window using “Open clean output” in the mixer.'; }
+
+let outputFrame;
+function driveMixer(now) {
+  const opener = window.opener;
+  if (opener && !opener.closed) {
+    opener.dispatchEvent(new CustomEvent('mist-output-frame', { detail: { output: window, time: performance.timeOrigin + now } }));
+    outputFrame = requestAnimationFrame(driveMixer);
+  }
+}
+outputFrame = requestAnimationFrame(driveMixer);
+window.addEventListener('pagehide', () => { cancelAnimationFrame(outputFrame); clearTimeout(hintTimer); });

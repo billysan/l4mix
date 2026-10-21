@@ -1,6 +1,11 @@
 // Normalized screen coordinates, clockwise from top left.
 export function defaultCorners() { return [[0, 0], [1, 0], [1, 1], [0, 1]]; }
 
+export function identityCorners(points) {
+  const original = defaultCorners();
+  return points?.length === 4 && points.every((p, i) => p[0] === original[i][0] && p[1] === original[i][1]);
+}
+
 export function validCorners(points) {
   if (points?.length !== 4 || points.some(p => p.length !== 2 || p.some(v => !Number.isFinite(v) || v < 0 || v > 1))) return false;
   // Reject crossed, concave, or nearly collapsed quads before solving a homography.

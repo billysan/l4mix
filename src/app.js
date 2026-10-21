@@ -1,10 +1,10 @@
 import { PARAMETERS, defaults, clampParameter, formatParameter, MAX_SOURCES } from './parameters.js';
 import { Renderer } from './renderer.js';
-import { defaultCorners, validCorners } from './mapping.js';
+import { defaultCorners, validCorners, identityCorners } from './mapping.js';
 
 const $ = selector => document.querySelector(selector);
 const sources = [];
-const mapping = { enabled: false, points: defaultCorners() };
+const mapping = { editing: false, points: defaultCorners() };
 const master = { id: 'master', values: defaults(true), controls: new Map() };
 let renderer, nextId = 1, replacementId = null, outputWindow = null, outputStream = null;
 let renderDirty = true, lastRender = -Infinity, lastStats = performance.now(), frames = 0, disposed = false;
@@ -201,7 +201,7 @@ window.addEventListener('dragover', e => { if (e.dataTransfer.types.includes('Fi
 window.addEventListener('dragenter', e => { if (e.dataTransfer.types.includes('Files')) { e.preventDefault(); dragDepth++; $('#drop-zone').classList.add('drag-over'); } });
 window.addEventListener('dragleave', () => { dragDepth = Math.max(0, dragDepth - 1); if (!dragDepth) $('#drop-zone').classList.remove('drag-over'); });
 window.addEventListener('drop', e => { e.preventDefault(); dragDepth = 0; $('#drop-zone').classList.remove('drag-over'); if (e.dataTransfer.files.length) addFiles(e.dataTransfer.files); });
-$('#reset-all').onclick = () => { sources.forEach(reset); reset(master); mapping.enabled = false; $('#mapping-toggle').checked = false; resetMapping(); };
+$('#reset-all').onclick = () => { sources.forEach(reset); reset(master); mapping.editing = false; $('#mapping-toggle').checked = false; resetMapping(); };
 $('#resolution').onchange = e => {
   if (!renderer) return;
   const h = Number(e.target.value);
@@ -214,7 +214,11 @@ window.addEventListener('mist-output-ready', e => {
   try {
     stopOutputStream();
     if (!canvas.captureStream) throw new Error('Canvas streaming is unavailable in this browser. Try a current Chromium or Firefox browser.');
-    outputStream = canvas.captureStream(30); outputWindow.setMixerStream(outputStream); renderDirty = true;
+    outputStream = canvas.captureStream(0);
+    if (typeof outputStream.getVideoTracks()[0]?.requestFrame !== 'function') {
+      stopOutputStream(); outputStream = canvas.captureStream(30);
+    }
+    outputWindow.setMixerStream(outputStream); renderDirty = true;
     outputWindow.addEventListener('pagehide', () => { stopOutputStream(); $('#open-output').innerHTML = 'Open clean output <span aria-hidden="true">↗</span>'; });
     $('#open-output').innerHTML = 'Focus clean output <span aria-hidden="true">↗</span>';
   } catch (error) { message(`Clean output: ${error.message}`, true); }
@@ -224,16 +228,20 @@ $('#open-output').onclick = () => {
   outputWindow = window.open('/output.html', 'mist-clean-output', 'popup,width=960,height=540');
   if (!outputWindow) message('The output window was blocked. Allow pop-ups for this local site, then click Open clean output again.', true);
 };
-function tick(now) {
+function renderFrame(now, fromOutput = false) {
   if (disposed) return;
-  requestAnimationFrame(tick);
   // Leave the compositor at 30 Hz even on high-refresh-rate displays.
   if (now - lastRender < 1000 / 30 - 1) return;
   const playing = sources.some(s => !s.error && !s.video.paused && s.values.opacity > 0);
-  const visibleOutput = outputWindow && !outputWindow.closed;
-  if (document.hidden && !visibleOutput) return;
+  if (document.hidden && !fromOutput) return;
   if (renderer && (renderDirty || playing || sources.some(s => s.dirty && s.values.opacity > 0))) {
-    try { if (renderer.render(sources, master.values, mapping)) { renderDirty = false; frames++; } }
+    try {
+      if (renderer.render(sources, master.values, mapping)) {
+        renderDirty = false; frames++;
+        // Explicit capture also works when the mixer canvas is covered by fullscreen output.
+        if (outputStream) { renderer.gl.flush(); outputStream.getVideoTracks()[0]?.requestFrame?.(); }
+      }
+    }
     catch (error) { message(`Rendering stopped: ${error.message}. Try 720p or reload the mixer.`, true); renderer = null; }
   }
   lastRender = now;
@@ -244,20 +252,22 @@ function tick(now) {
     lastStats = now; frames = 0;
   }
 }
-// rAF pauses in background tabs. Keep the same throttled render path alive for a second monitor.
-const backgroundTimer = setInterval(() => {
-  if (!document.hidden || !outputWindow || outputWindow.closed || !renderer || renderer.lost) return;
-  if (renderDirty || sources.some(s => s.values.opacity > 0 && (!s.video.paused || s.dirty))) {
-    try { renderer.render(sources, master.values, mapping); renderDirty = false; } catch { /* foreground path reports failures */ }
-  }
-}, 1000 / 30);
+function tick(now) {
+  if (disposed) return;
+  requestAnimationFrame(tick); renderFrame(now);
+}
+// Use the visible output window's clock when the mixer window is occluded.
+window.addEventListener('mist-output-frame', e => {
+  if (e.detail?.output !== outputWindow || !Number.isFinite(e.detail.time)) return;
+  renderFrame(e.detail.time - performance.timeOrigin, true);
+});
 window.addEventListener('pagehide', () => {
-  disposed = true; clearInterval(backgroundTimer); sources.forEach(disposeSource); stopOutputStream(); renderer?.dispose(); if (outputWindow && !outputWindow.closed) outputWindow.close();
+  disposed = true; sources.forEach(disposeSource); stopOutputStream(); renderer?.dispose(); if (outputWindow && !outputWindow.closed) outputWindow.close();
 });
 const handles = [...document.querySelectorAll('.mapping-handle')];
 function updateMapping() {
-  $('#mapping-overlay').hidden = !mapping.enabled;
-  $('#reset-mapping').disabled = !mapping.enabled;
+  $('#mapping-overlay').hidden = !mapping.editing;
+  $('#reset-mapping').disabled = identityCorners(mapping.points);
   mapping.points.forEach(([x, y], i) => {
     handles[i].style.setProperty('--x', `${x * 100}%`);
     handles[i].style.setProperty('--y', `${y * 100}%`);
@@ -273,7 +283,7 @@ function moveCorner(index, x, y) {
   if (!validCorners(points)) return;
   mapping.points = points; updateMapping();
 }
-$('#mapping-toggle').onchange = e => { mapping.enabled = e.target.checked; updateMapping(); };
+$('#mapping-toggle').onchange = e => { mapping.editing = e.target.checked; updateMapping(); };
 $('#reset-mapping').onclick = resetMapping;
 handles.forEach((handle, index) => {
   let dragging = false;
@@ -282,7 +292,7 @@ handles.forEach((handle, index) => {
     e.preventDefault(); handle.focus(); handle.setPointerCapture(e.pointerId); dragging = true;
   });
   handle.addEventListener('pointermove', e => {
-    if (!dragging || !mapping.enabled) return;
+    if (!dragging || !mapping.editing) return;
     const bounds = $('#mapping-surface').getBoundingClientRect();
     moveCorner(index, (e.clientX - bounds.left) / bounds.width, (e.clientY - bounds.top) / bounds.height);
   });
