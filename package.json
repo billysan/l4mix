@@ -6,7 +6,7 @@
   "scripts": {
     "start": "node server.mjs",
     "test": "node --test tests/*.test.mjs",
-    "check": "node --check src/app.js && node --check src/renderer.js && node --check src/parameters.js && node --check src/mapping.js && node --check server.mjs",
+    "check": "node --check src/app.js && node --check src/renderer.js && node --check src/parameters.js && node --check src/mapping.js && node --check src/transport.js && node --check src/icons.js && node --check server.mjs",
     "test:browser": "playwright test"
   },
   "devDependencies": {

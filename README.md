@@ -17,11 +17,18 @@ Open **http://localhost:5173**. No installation is needed to run the mixer. The 
 - Drop up to **two video files** onto the window, or click the **+** beside **SOURCE**. Browser codec support determines which files play; MP4 and WebM are good starting points.
 - Each source starts at **0% opacity**. Raise opacity to bring it into the mix. The master starts at 100%. Sources use screen blending: at 100%, each source combines with the others instead of hiding them. Black contributes nothing; opacity controls the strength of each source.
 - Drag a knob up/down; hold Shift for finer movement. Use arrow keys, Page Up/Down, or Home/End with a focused knob. Double-click to reset. Click a displayed value to type a number; Enter commits and Escape cancels. Percentages are entered as 0–100.
-- Pause, toggle looping, replace, reorder, or remove clips with the controls beside each thumbnail. Replacing a clip retains that row’s effect settings. Screen blending is independent of source order. Videos are muted.
+- Pause playback, eject a clip, or enable back-and-forth playback with the controls beside each source. Click a filename to replace its clip; replacements retain that row’s effects, preview preference, and rewind mode. Screen blending is independent of source order. Videos are muted.
+- Source previews start **off**. Their monitor tiles show play/pause symbols; the eye button reveals the existing video element, without opening another decoder. Turning the eye off avoids painting that preview; active clips still need decoding for the mix.
+- The **MASTER** row’s funnel represents the combined mix. Its pause button pauses all sources together and resumes only the ones that were playing. Its eye hides the large output monitor while preserving clean output. With that monitor hidden and no output window open, compositing stops until needed again.
+- Rewind is **off by default**, so clips loop normally. Enable the rewind button for forward → reverse → forward playback. Reverse uses paced seeks at up to 24 updates/second because negative playback speed is not portable across browsers; its smoothness and CPU cost depend on codec and keyframe spacing. No complete clip is cached as decoded frames.
 - The global **RESET** restores every source and master effect, hides mapping handles, and restores all four corners. Each source’s **RESET** only resets that source’s effects (including opacity to zero); the master’s **RESET** only resets the master. Loaded clips and their transport settings are retained.
 - **Open clean output** opens a separate picture-only window. Move it to another monitor and use its fullscreen button or double-click the picture. Allow local pop-ups if the browser blocks it. Keep the mixer open while using the output window.
 
 The mixer interface is scaled to **140%**. Set Chrome’s page zoom to **100%** to use that intended size; browser zoom compounds with the built-in scale. Output resolution and the clean output window are unaffected.
+
+## Browser choice
+
+**Chromium is the recommended browser for this build.** In a local headless spot check using two 360p H.264 sample clips, 720p output, source previews off, cloning and hue effects, Chromium 150 with SwiftShader reached 30 fps and Firefox 152 reached about 20 fps. This compares those specific configurations; desktop performance can differ. Firefox successfully loaded and mixed the same clips.
 
 ## Controls
 
@@ -70,7 +77,7 @@ npx playwright install chromium
 npm run test:browser
 ```
 
-Browser tests use Chromium’s software WebGL renderer to exercise shader pixels, opacity blending, clone orientation, perspective mapping and reset isolation, color effects, context recovery, two-source limits, controls, transport, replacement/removal, clean output, fullscreen motion with suspended mixer clocks, screen blending at full opacity, hidden mapping guides, invalid files, and mobile overflow. The benchmark uses two generated 1080p VP8 clips; results are printed and attached in `test-results/`.
+Browser tests use Chromium’s software WebGL renderer to exercise shader pixels, opacity blending, clone orientation, perspective mapping and reset isolation, color effects, context recovery, two-source limits, controls, transport, replacement/removal, preview toggles, master pause/resume, eject, reverse playback, clean output, fullscreen motion with suspended mixer clocks, screen blending at full opacity, hidden mapping guides, invalid files, and mobile overflow. The benchmark uses two generated 1080p VP8 clips; results are printed and attached in `test-results/`.
 
 On NixOS, use an installed Nix Chromium instead of Playwright’s downloaded binary:
 

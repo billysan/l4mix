@@ -1,11 +1,13 @@
 import { PARAMETERS, defaults, clampParameter, formatParameter, MAX_SOURCES } from './parameters.js';
 import { Renderer } from './renderer.js';
 import { defaultCorners, validCorners, identityCorners } from './mapping.js';
+import { SourceTransport } from './transport.js';
+import { icon } from './icons.js';
 
 const $ = selector => document.querySelector(selector);
 const sources = [];
 const mapping = { editing: false, points: defaultCorners() };
-const master = { id: 'master', values: defaults(true), controls: new Map() };
+const master = { id: 'master', values: defaults(true), controls: new Map(), paused: false, preview: true };
 let renderer, nextId = 1, replacementId = null, outputWindow = null, outputStream = null;
 let renderDirty = true, lastRender = -Infinity, lastStats = performance.now(), frames = 0, disposed = false;
 const canvas = $('#output');
@@ -19,11 +21,11 @@ function message(text, persistent = false) {
 }
 try {
   renderer = new Renderer(canvas, {
-    onLost: error => { message(error?.message || 'Graphics context lost. Waiting for the browser to restore it…', true); $('#signal-label').textContent = 'GRAPHICS LOST'; },
+    onLost: error => { message(error?.message || 'Graphics context lost. Waiting for the browser to restore it…', true); setSignal(false, 'Graphics context lost'); },
     onRestored: () => { sources.forEach(s => { s.dirty = true; }); renderDirty = true; message('Graphics restored.'); updateMonitor(); },
   });
 } catch (error) {
-  message(error.message, true); $('#signal-label').textContent = 'GRAPHICS UNAVAILABLE';
+  message(error.message, true); setSignal(false, 'Graphics unavailable');
   $('#open-output').disabled = true;
 }
 
@@ -83,11 +85,45 @@ function knob(parameter, owner) {
 for (const p of PARAMETERS) {
   const label = document.createElement('div'); label.textContent = p.label; label.className = `parameter-label ${p.group || ''}`; $('#column-headings').append(label);
 }
+const monitorPlaceholder = document.createElement('div'); monitorPlaceholder.className = 'monitor-placeholder'; monitorPlaceholder.innerHTML = icon('funnel'); monitorPlaceholder.hidden = true; canvas.after(monitorPlaceholder);
 const masterRow = document.createElement('div'); masterRow.className = 'matrix-row master'; masterRow.dataset.source = 'master';
-const masterLabel = document.createElement('div'); masterLabel.className = 'source-cell master-label';
-masterLabel.innerHTML = '<strong>Master</strong><button class="reset-button" aria-label="Reset master effects" title="Reset master effects">RESET</button>';
-masterLabel.querySelector('button').onclick = () => reset(master);
+const masterLabel = document.createElement('div'); masterLabel.className = 'source-cell';
+const masterThumb = document.createElement('div'); masterThumb.className = 'thumbnail master-thumbnail';
+masterThumb.innerHTML = `<span class="preview-placeholder">${icon('funnel')}</span>`;
+const masterEye = iconButton('eye', 'Master monitor', () => {
+  master.preview = !master.preview; updateMaster(); updateMapping(); renderDirty = true;
+});
+masterEye.classList.add('preview-eye'); masterThumb.append(masterEye);
+const masterDetails = document.createElement('div'); masterDetails.className = 'source-details';
+masterDetails.innerHTML = '<strong>MASTER</strong><small id="master-status">IDLE</small>';
+const masterTransport = document.createElement('div'); masterTransport.className = 'transport';
+const masterPlay = iconButton('pause', 'Pause all sources', toggleMasterPause);
+const masterReset = sourceButton('RESET', 'Reset master effects', () => reset(master)); masterReset.className = 'reset-button';
+masterTransport.append(masterPlay, masterReset); masterDetails.append(masterTransport);
+const masterOperations = document.createElement('div'); masterOperations.className = 'row-operations';
+masterLabel.append(masterThumb, masterDetails, masterOperations);
 masterRow.append(masterLabel, ...PARAMETERS.map(p => knob(p, master))); $('#master-row').append(masterRow);
+
+function updateMaster() {
+  setIcon(masterPlay, master.paused ? 'play' : 'pause', master.paused ? 'Resume all sources' : 'Pause all sources');
+  setIcon(masterEye, master.preview ? 'eye' : 'eyeOff'); masterEye.setAttribute('aria-pressed', master.preview);
+  masterEye.title = master.preview ? 'Hide output monitor' : 'Show output monitor';
+  $('#master-status').textContent = !sources.length ? 'IDLE' : master.paused ? 'PAUSED' : 'PLAYING';
+  $('#monitor-shell').classList.toggle('preview-disabled', !master.preview); monitorPlaceholder.hidden = master.preview;
+}
+function toggleMasterPause() {
+  master.paused = !master.paused;
+  for (const source of sources) {
+    if (master.paused) { source.resumeAfterMaster = !source.transport.paused; source.transport.pause(); }
+    else if (source.resumeAfterMaster && !source.error) { source.resumeAfterMaster = false; source.transport.play(); }
+    source.updateStatus();
+  }
+  updateMaster(); renderDirty = true;
+}
+function setSignal(active, title = '') {
+  $('#signal-label').textContent = `${active ? 'V' : 'X'} SIGNAL`;
+  $('#signal-label').classList.toggle('active', active); $('#signal-label').title = title;
+}
 
 function reset(owner) {
   Object.assign(owner.values, defaults(owner.id === 'master'));
@@ -97,8 +133,7 @@ function updateMonitor() {
   if (!renderer) return;
   if (renderer.lost) return;
   const active = sources.some(s => !s.error && s.video.readyState >= 2 && s.values.opacity > 0) && master.values.opacity > 0;
-  $('#signal-label').textContent = active ? 'SIGNAL ACTIVE' : sources.length ? 'SOURCES READY / OPACITY 0' : 'NO SIGNAL';
-  $('#signal-label').classList.toggle('active', active);
+  setSignal(active);
 }
 function updateRows() {
   const container = $('#source-rows');
@@ -107,30 +142,40 @@ function updateRows() {
     const index = sources.indexOf(source);
     source.up.disabled = index === 0; source.down.disabled = index === sources.length - 1;
   }
-  $('#source-count').textContent = `${sources.length} / ${MAX_SOURCES} SOURCES`;
+  $('#source-count').textContent = `${sources.length} / ${MAX_SOURCES}`;
   $('#empty-add').disabled = sources.length >= MAX_SOURCES;
-  renderDirty = true; updateMonitor();
+  renderDirty = true; updateMonitor(); updateMaster();
 }
 function sourceButton(text, label, action) {
   const b = document.createElement('button'); b.className = 'icon-button'; b.textContent = text; b.title = label; b.setAttribute('aria-label', label); b.onclick = action; return b;
 }
 function sourceError(source, text) {
   if (source.removed) return;
-  source.error = true; clearTimeout(source.loadTimeout); source.video.pause(); source.status.textContent = 'PLAYBACK ERROR'; source.status.classList.add('error'); source.dirty = true; renderDirty = true;
+  source.error = true; clearTimeout(source.loadTimeout); source.transport.pause(); source.status.textContent = 'PLAYBACK ERROR'; source.status.classList.add('error'); source.dirty = true; renderDirty = true;
   message(`${source.file.name}: ${text} Try replacing it with a browser-playable MP4 or WebM.`, true); updateMonitor();
 }
-async function play(source) {
-  try { await source.video.play(); }
-  catch (error) {
-    if (source.removed || error.name === 'AbortError') return;
-    if (error.name === 'NotAllowedError') { source.status.textContent = 'CLICK PLAY'; message('Playback needs a click. Use the source’s play button.'); }
-    else sourceError(source, 'The browser could not play this file.');
-  }
+function setIcon(button, name, label) {
+  button.innerHTML = icon(name);
+  if (label) { button.setAttribute('aria-label', label); button.title = label; }
+}
+function iconButton(name, label, action) {
+  const button = sourceButton('', label, action); setIcon(button, name); return button;
+}
+function updateSourcePreview(source) {
+  source.video.hidden = !source.preview;
+  source.placeholder.hidden = source.preview;
+  source.placeholder.innerHTML = icon(source.transport.paused ? 'play' : 'pause');
+  setIcon(source.eye, source.preview ? 'eye' : 'eyeOff'); source.eye.setAttribute('aria-pressed', source.preview);
+  source.eye.title = source.preview ? 'Hide source preview' : 'Show source preview';
+}
+function play(source) {
+  if (master.paused) { source.resumeAfterMaster = true; source.updateStatus(); return; }
+  return source.transport.play();
 }
 function disposeSource(source) {
   source.removed = true;
   if (source.frameHandle != null && source.video.cancelVideoFrameCallback) source.video.cancelVideoFrameCallback(source.frameHandle);
-  clearTimeout(source.loadTimeout); source.video.pause(); source.video.removeAttribute('src'); source.video.load(); source.video.remove();
+  clearTimeout(source.loadTimeout); source.transport.dispose(); source.video.removeAttribute('src'); source.video.load(); source.video.remove();
   URL.revokeObjectURL(source.url); renderer?.remove(source.id); source.controls.clear(); source.row.remove();
 }
 function removeSource(source) {
@@ -139,37 +184,56 @@ function removeSource(source) {
 }
 function createSource(file, existing = null) {
   const number = nextId++;
-  const source = { id: `source-${number}`, number, file, values: existing ? { ...existing.values } : defaults(), controls: new Map(), dirty: true, error: false, removed: false, frameHandle: null };
+  const source = { id: `source-${number}`, number, file, values: existing ? { ...existing.values } : defaults(), controls: new Map(), dirty: true, error: false, removed: false, frameHandle: null, preview: existing?.preview ?? false };
   const video = document.createElement('video'); source.video = video;
-  video.muted = true; video.loop = true; video.playsInline = true; video.preload = 'auto';
+  video.muted = true; video.playsInline = true; video.preload = 'auto'; video.hidden = !source.preview;
+  source.transport = new SourceTransport(video, {
+    onChange: () => source.updateStatus?.(),
+    onError: error => {
+      if (source.removed) return;
+      if (error.name === 'NotAllowedError') { source.status.textContent = 'CLICK PLAY'; message('Playback needs a click. Use the source’s play button.'); }
+      else sourceError(source, 'The browser could not play this file.');
+    },
+  });
   source.url = URL.createObjectURL(file); video.src = source.url;
   const row = document.createElement('div'); row.className = 'matrix-row source-row'; row.dataset.source = source.id; source.row = row;
   const cell = document.createElement('div'); cell.className = 'source-cell';
   const thumb = document.createElement('div'); thumb.className = 'thumbnail'; thumb.append(video);
+  const togglePlayback = () => { if (source.transport.paused) play(source); else source.transport.pause(); };
+  const placeholder = sourceButton('', 'Toggle source playback', togglePlayback); placeholder.className = 'preview-placeholder'; source.placeholder = placeholder; thumb.append(placeholder);
+  source.eye = iconButton('eyeOff', 'Source preview', () => { source.preview = !source.preview; updateSourcePreview(source); }); source.eye.classList.add('preview-eye'); thumb.append(source.eye);
   const badge = document.createElement('span'); badge.className = 'source-badge'; badge.textContent = String(number).padStart(2, '0'); thumb.append(badge);
   const details = document.createElement('div'); details.className = 'source-details';
-  const name = document.createElement('strong'); name.textContent = file.name; name.title = file.name;
+  const nameButton = sourceButton('', 'Replace video', () => { replacementId = source.id; $('#replace-input').click(); }); nameButton.className = 'source-name';
+  const name = document.createElement('strong'); name.textContent = file.name; nameButton.title = `Replace ${file.name}`; nameButton.append(name);
   const status = document.createElement('small'); status.textContent = 'LOADING…'; source.status = status;
   const transport = document.createElement('div'); transport.className = 'transport';
-  const playButton = sourceButton('Ⅱ', 'Pause video', () => { if (video.paused) play(source); else video.pause(); });
-  const loop = sourceButton('↻', 'Loop video', () => { video.loop = !video.loop; loop.classList.toggle('enabled', video.loop); loop.setAttribute('aria-pressed', video.loop); }); loop.classList.add('enabled'); loop.setAttribute('aria-pressed', 'true');
-  const replace = sourceButton('⇄', 'Replace video', () => { replacementId = source.id; $('#replace-input').click(); });
+  const playButton = iconButton('pause', 'Pause video', togglePlayback); source.playButton = playButton;
+  const eject = iconButton('eject', 'Eject video', () => removeSource(source));
+  const rewind = iconButton('rewind', 'Back-and-forth playback', () => source.transport.setPingPong(!source.transport.pingPong));
   const resetSource = sourceButton('RESET', 'Reset source effects', () => reset(source)); resetSource.className = 'reset-button';
-  transport.append(playButton, loop, replace, resetSource); details.append(name, status, transport);
+  transport.append(playButton, eject, rewind, resetSource); details.append(nameButton, status, transport);
   const operations = document.createElement('div'); operations.className = 'row-operations';
   const move = amount => { const index = sources.indexOf(source), to = index + amount; if (to < 0 || to >= sources.length) return; [sources[index], sources[to]] = [sources[to], sources[index]]; updateRows(); };
   source.up = sourceButton('↑', 'Move layer up', () => move(-1)); source.down = sourceButton('↓', 'Move layer down', () => move(1));
-  operations.append(source.up, source.down, sourceButton('×', 'Remove video', () => removeSource(source)));
+  operations.append(source.up, source.down);
   cell.append(thumb, details, operations); row.append(cell, ...PARAMETERS.map(p => knob(p, source)));
-  const updateStatus = () => {
+  source.updateStatus = () => {
     if (source.error || source.removed) return;
-    status.textContent = `${video.videoWidth}×${video.videoHeight} · ${video.paused ? 'PAUSED' : 'PLAYING'}`;
-    playButton.textContent = video.paused ? '▶' : 'Ⅱ'; playButton.setAttribute('aria-label', video.paused ? 'Play video' : 'Pause video'); playButton.title = playButton.getAttribute('aria-label');
-    renderDirty = true; updateMonitor();
+    const paused = source.transport.paused;
+    status.textContent = `${video.videoWidth}×${video.videoHeight} · ${paused ? 'PAUSED' : 'PLAYING'}`;
+    row.dataset.direction = String(source.transport.direction);
+    setIcon(playButton, paused ? 'play' : 'pause', paused ? 'Play video' : 'Pause video');
+    playButton.disabled = master.paused; placeholder.disabled = master.paused;
+    rewind.classList.toggle('enabled', source.transport.pingPong); rewind.setAttribute('aria-pressed', source.transport.pingPong);
+    updateSourcePreview(source); renderDirty = true; updateMonitor();
   };
-  video.addEventListener('loadeddata', () => { if (source.removed) return; clearTimeout(source.loadTimeout); source.dirty = true; updateStatus(); play(source); });
+  if (existing?.transport.pingPong) source.transport.setPingPong(true);
+  rewind.setAttribute('aria-pressed', source.transport.pingPong); updateSourcePreview(source);
+  video.addEventListener('loadeddata', () => { if (source.removed) return; clearTimeout(source.loadTimeout); source.dirty = true; source.updateStatus(); play(source); });
   video.addEventListener('error', () => { clearTimeout(source.loadTimeout); sourceError(source, 'Unsupported codec, damaged file, or decoding failure.'); });
-  for (const event of ['play', 'pause', 'ended', 'seeked']) video.addEventListener(event, updateStatus);
+  for (const event of ['play', 'pause', 'ended', 'seeked']) video.addEventListener(event, source.updateStatus);
+  video.addEventListener('seeked', () => { source.dirty = true; });
   video.addEventListener('timeupdate', () => { if (!video.requestVideoFrameCallback) source.dirty = true; });
   if (video.requestVideoFrameCallback) {
     const onFrame = () => { if (source.removed) return; source.dirty = true; source.frameHandle = video.requestVideoFrameCallback(onFrame); };
@@ -232,9 +296,10 @@ function renderFrame(now, fromOutput = false) {
   if (disposed) return;
   // Leave the compositor at 30 Hz even on high-refresh-rate displays.
   if (now - lastRender < 1000 / 30 - 1) return;
-  const playing = sources.some(s => !s.error && !s.video.paused && s.values.opacity > 0);
+  for (const source of sources) if (!source.error) source.transport.update(now);
+  const playing = sources.some(s => !s.error && !s.transport.paused && s.values.opacity > 0);
   if (document.hidden && !fromOutput) return;
-  if (renderer && (renderDirty || playing || sources.some(s => s.dirty && s.values.opacity > 0))) {
+  if (renderer && (master.preview || (outputWindow && !outputWindow.closed)) && (renderDirty || playing || sources.some(s => s.dirty && s.values.opacity > 0))) {
     try {
       if (renderer.render(sources, master.values, mapping)) {
         renderDirty = false; frames++;
@@ -266,7 +331,7 @@ window.addEventListener('pagehide', () => {
 });
 const handles = [...document.querySelectorAll('.mapping-handle')];
 function updateMapping() {
-  $('#mapping-overlay').hidden = !mapping.editing;
+  $('#mapping-overlay').hidden = !mapping.editing || !master.preview;
   $('#reset-mapping').disabled = identityCorners(mapping.points);
   mapping.points.forEach(([x, y], i) => {
     handles[i].style.setProperty('--x', `${x * 100}%`);
@@ -307,4 +372,4 @@ handles.forEach((handle, index) => {
     }
   });
 });
-updateMapping(); updateRows(); requestAnimationFrame(tick);
+updateMaster(); updateMapping(); updateRows(); requestAnimationFrame(tick);
