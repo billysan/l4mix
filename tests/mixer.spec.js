@@ -107,7 +107,7 @@ test('two-file lifecycle, knob interactions, replacement, and clean output', asy
   await first.getByRole('button', { name: 'Pause video', exact: true }).click(); await expect(first.locator('small')).toContainText('PAUSED');
   await expect(first.getByRole('button', { name: 'Back-and-forth playback', exact: true })).toHaveCount(0);
   await first.getByRole('button', { name: 'Play video', exact: true }).click();
-  await first.getByRole('button', { name: 'Move layer down', exact: true }).click(); await expect(page.locator('.source-row').first().locator('strong')).toHaveText('second.webm');
+  await expect(page.getByRole('button', { name: /Move layer (up|down)/ })).toHaveCount(0);
   const popupPromise = page.waitForEvent('popup'); await page.locator('#open-output').click(); const popup = await popupPromise;
   await expect.poll(() => popup.locator('video').evaluate(v => v.readyState)).toBeGreaterThanOrEqual(2);
   expect(await popup.locator('video').evaluate(v => v.videoWidth)).toBe(1280);
@@ -120,9 +120,9 @@ test('two-file lifecycle, knob interactions, replacement, and clean output', asy
   await expect.poll(() => reopened.locator('video').evaluate(v => v.readyState)).toBeGreaterThanOrEqual(2); await reopened.close();
   const row = page.locator('.source-row').first();
   await row.getByRole('button', { name: 'Replace video', exact: true }).click(); await page.locator('#replace-input').setInputFiles({ ...fixture, name: 'replacement.webm' });
-  await expect(row.locator('strong')).toHaveText('replacement.webm'); await expect(row.getByRole('slider').first()).toHaveAttribute('aria-valuenow', '0.5');
+  await expect(row.locator('strong')).toHaveText('replacement.webm'); await expect(row.getByRole('slider').first()).toHaveAttribute('aria-valuenow', '0.75');
   await row.getByRole('button', { name: 'Reset source effects', exact: true }).click(); await expect(row.getByRole('slider').first()).toHaveAttribute('aria-valuenow', '0');
-  await expect(page.locator('.source-row').nth(1).getByRole('slider').first()).toHaveAttribute('aria-valuenow', '0.75');
+  await expect(page.locator('.source-row').nth(1).getByRole('slider').first()).toHaveAttribute('aria-valuenow', '0.5');
   await page.locator('#reset-all').click(); await expect(row.getByRole('slider').first()).toHaveAttribute('aria-valuenow', '0'); await expect(page.locator('.master').getByRole('slider').first()).toHaveAttribute('aria-valuenow', '1');
   await row.getByRole('button', { name: 'Remove video', exact: true }).click(); await page.locator('.source-row').getByRole('button', { name: 'Remove video', exact: true }).click();
   await expect(page.locator('#empty-add')).toBeVisible(); await expect(page.locator('#empty-add')).toBeEnabled();
@@ -324,4 +324,68 @@ test('centered preview eyes, master controls and replacement through eject', asy
   await expect(page.locator('.source-column-label #source-count')).toHaveText('1 / 2');
   await page.locator('.source-row').getByRole('button', { name: 'Remove video', exact: true }).click(); await expect(page.locator('#signal-label')).toHaveText('X SIGNAL');
   expect(errors).toEqual([]);
+});
+
+test('Ctrl+arrows navigate channel controls and knobs without changing their values', async ({ page }, testInfo) => {
+  await page.goto('/'); const fixture = await clip(page);
+  await page.locator('#file-input').setInputFiles([fixture, { ...fixture, name: 'second.webm' }]);
+  const first = page.locator('.source-row').first(), second = page.locator('.source-row').nth(1), master = page.locator('.master');
+  await expect(first.locator('small')).toContainText('PLAYING');
+  await expect(page.getByRole('button', { name: /Move layer (up|down)/ })).toHaveCount(0);
+  const move = key => page.keyboard.press(`Control+${key}`);
+  await move('ArrowRight'); await expect(first.getByRole('slider').nth(0)).toBeFocused();
+  await expect(first.getByRole('slider').nth(0)).toHaveClass(/control-selected/);
+  await move('ArrowRight'); await expect(first.getByRole('slider').nth(1)).toBeFocused();
+  await expect(first.getByRole('slider').nth(0)).toHaveAttribute('aria-valuenow', '0');
+  await expect(first.getByRole('slider').nth(1)).toHaveAttribute('aria-valuenow', '0');
+  await move('ArrowDown'); await expect(second.getByRole('slider').nth(1)).toBeFocused();
+  await move('ArrowDown'); await expect(master.getByRole('slider').nth(1)).toBeFocused();
+  await move('ArrowDown'); await expect(master.getByRole('slider').nth(1)).toBeFocused();
+  await move('ArrowUp'); await expect(second.getByRole('slider').nth(1)).toBeFocused();
+  await move('ArrowLeft'); await expect(second.getByRole('slider').nth(0)).toBeFocused();
+  for (const label of ['Remove video', 'Reset source effects', 'Eject / replace video', 'Pause video', 'Replace video', 'Source preview']) {
+    await move('ArrowLeft'); await expect(second.getByRole('button', { name: label, exact: true })).toBeFocused();
+  }
+  await move('ArrowLeft'); await expect(second.getByRole('button', { name: 'Source preview', exact: true })).toBeFocused();
+  await move('ArrowUp'); await expect(first.getByRole('button', { name: 'Source preview', exact: true })).toBeFocused();
+  await move('ArrowUp'); await expect(first.getByRole('button', { name: 'Source preview', exact: true })).toBeFocused();
+  // A missing master eject falls back to play; returning up restores the eject column.
+  await second.getByRole('button', { name: 'Eject / replace video', exact: true }).focus();
+  await move('ArrowDown'); await expect(master.getByRole('button', { name: 'Pause all sources', exact: true })).toBeFocused();
+  await move('ArrowUp'); await expect(second.getByRole('button', { name: 'Eject / replace video', exact: true })).toBeFocused();
+  await second.getByRole('slider').nth(0).focus();
+  for (let i = 0; i < 11; i++) await move('ArrowRight');
+  const last = second.getByRole('slider').last(); await expect(last).toBeFocused();
+  expect(await last.evaluate(el => { const b = el.getBoundingClientRect(); return el.contains(document.elementFromPoint(b.x + b.width / 2, b.y + b.height / 2)); })).toBe(true);
+  await expect(page.locator('.control-selected')).toHaveCount(1);
+  await page.screenshot({ path: testInfo.outputPath('keyboard-selection.png'), fullPage: true });
+  await move('ArrowRight'); await expect(last).toBeFocused();
+  // Mouse selection and plain arrow adjustment remain available.
+  await second.getByRole('slider').nth(1).click(); await expect(second.getByRole('slider').nth(1)).toHaveClass(/control-selected/);
+  await page.keyboard.press('ArrowUp'); await expect(second.getByRole('slider').nth(1)).toHaveAttribute('aria-valuenow', '0.05');
+  const number = second.locator('.knob-value').nth(1); await number.fill('42');
+  await move('ArrowLeft'); await expect(number).toBeFocused(); await number.press('Enter');
+  await expect(second.getByRole('slider').nth(1)).toHaveAttribute('aria-valuenow', '0.42');
+  await expect(second.getByRole('slider').nth(1)).toBeFocused();
+});
+
+test('Ctrl navigation skips disabled controls and recovers after removing a source', async ({ page }) => {
+  await page.goto('/'); const fixture = await clip(page);
+  await page.locator('#file-input').setInputFiles([fixture, { ...fixture, name: 'second.webm' }]);
+  const first = page.locator('.source-row').first(), second = page.locator('.source-row').nth(1), master = page.locator('.master');
+  await expect(first.locator('small')).toContainText('PLAYING');
+  await master.getByRole('button', { name: 'Pause all sources', exact: true }).click();
+  await expect(second.getByRole('button', { name: 'Play video', exact: true })).toBeDisabled();
+  await second.getByRole('button', { name: 'Eject / replace video', exact: true }).focus();
+  await page.keyboard.press('Control+ArrowLeft'); await expect(second.getByRole('button', { name: 'Replace video', exact: true })).toBeFocused();
+  await first.getByRole('button', { name: 'Remove video', exact: true }).focus();
+  await page.keyboard.press('Enter'); await expect(page.locator('.source-row')).toHaveCount(1);
+  const remaining = page.locator('.source-row');
+  await expect(remaining.getByRole('button', { name: 'Remove video', exact: true })).toBeFocused();
+  await page.keyboard.press('Control+ArrowRight'); await expect(remaining.getByRole('slider').first()).toBeFocused();
+  await page.keyboard.press('Control+ArrowDown'); await expect(master.getByRole('slider').first()).toBeFocused();
+  await remaining.getByRole('button', { name: 'Remove video', exact: true }).click();
+  await expect(page.locator('.source-row')).toHaveCount(0); await expect(master.getByRole('button', { name: 'Reset master effects', exact: true })).toBeFocused();
+  await page.keyboard.press('Control+ArrowRight'); await expect(master.getByRole('slider').first()).toBeFocused();
+  await page.locator('#resolution').focus(); await page.keyboard.press('Control+ArrowLeft'); await expect(page.locator('#resolution')).toBeFocused();
 });

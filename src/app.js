@@ -3,6 +3,7 @@ import { Renderer } from './renderer.js';
 import { defaultCorners, validCorners, identityCorners } from './mapping.js';
 import { SourceTransport } from './transport.js';
 import { icon } from './icons.js';
+import { controlNavigation } from './navigation.js';
 
 const $ = selector => document.querySelector(selector);
 const sources = [];
@@ -62,6 +63,7 @@ function knob(parameter, owner) {
   control.addEventListener('pointerup', end); control.addEventListener('lostpointercapture', end);
   control.addEventListener('dblclick', () => set(owner.id === 'master' ? (parameter.master ?? parameter.initial) : parameter.initial));
   control.addEventListener('keydown', e => {
+    if (e.ctrlKey || e.altKey || e.metaKey) return;
     const direction = { ArrowUp: 1, ArrowRight: 1, ArrowDown: -1, ArrowLeft: -1, PageUp: 10, PageDown: -10 }[e.key];
     if (direction) { e.preventDefault(); set(owner.values[parameter.key] + direction * parameter.step * (e.shiftKey ? 1 : parameter.step < 1 ? 5 : 1)); }
     if (e.key === 'Home' || e.key === 'End') { e.preventDefault(); set(e.key === 'Home' ? parameter.min : parameter.max); }
@@ -102,6 +104,7 @@ masterTransport.append(masterPlay, masterReset); masterDetails.append(masterTran
 const masterOperations = document.createElement('div'); masterOperations.className = 'row-operations';
 masterLabel.append(masterThumb, masterDetails, masterOperations);
 masterRow.append(masterLabel, ...PARAMETERS.map(p => knob(p, master))); $('#master-row').append(masterRow);
+const navigation = controlNavigation($('#matrix'));
 
 function updateMaster() {
   setIcon(masterPlay, master.paused ? 'play' : 'pause', master.paused ? 'Resume all sources' : 'Pause all sources');
@@ -138,12 +141,10 @@ function updateRows() {
   const container = $('#source-rows');
   for (const source of sources) {
     container.append(source.row);
-    const index = sources.indexOf(source);
-    source.up.disabled = index === 0; source.down.disabled = index === sources.length - 1;
   }
   $('#source-count').textContent = `${sources.length} / ${MAX_SOURCES}`;
   $('#empty-add').disabled = sources.length >= MAX_SOURCES;
-  renderDirty = true; updateMonitor(); updateMaster();
+  renderDirty = true; updateMonitor(); updateMaster(); navigation.refresh();
 }
 function sourceButton(text, label, action) {
   const b = document.createElement('button'); b.className = 'icon-button'; b.textContent = text; b.title = label; b.setAttribute('aria-label', label); b.onclick = action; return b;
@@ -209,9 +210,7 @@ function createSource(file, existing = null) {
   const resetSource = sourceButton('RESET', 'Reset source effects', () => reset(source)); resetSource.className = 'reset-button';
   transport.append(playButton, eject, resetSource); details.append(nameButton, status, transport);
   const operations = document.createElement('div'); operations.className = 'row-operations';
-  const move = amount => { const index = sources.indexOf(source), to = index + amount; if (to < 0 || to >= sources.length) return; [sources[index], sources[to]] = [sources[to], sources[index]]; updateRows(); };
-  source.up = sourceButton('↑', 'Move layer up', () => move(-1)); source.down = sourceButton('↓', 'Move layer down', () => move(1));
-  operations.append(source.up, source.down, sourceButton('×', 'Remove video', () => removeSource(source)));
+  operations.append(sourceButton('×', 'Remove video', () => removeSource(source)));
   cell.append(thumb, details, operations); row.append(cell, ...PARAMETERS.map(p => knob(p, source)));
   source.updateStatus = () => {
     if (source.error || source.removed) return;

@@ -122,3 +122,8 @@ select { background: #262626; color: var(--text); border: 1px solid #4b4b4b; pad
 .monitor-placeholder { position: absolute; inset: 0; display: grid; place-items: center; background: #0b0b0b; color: #888; }
 .monitor-placeholder svg { width: 30px; height: 30px; }
 .preview-disabled #output { visibility: hidden; }
+
+.matrix .control-selected { outline: 2px solid #f0eee8; outline-offset: 3px; box-shadow: 0 0 0 5px #ffffff14; }
+.knob-cell:has(.control-selected) { background-color: #ffffff0b; }
+.matrix .preview-eye.control-selected { outline-offset: -3px; box-shadow: inset 0 0 0 2px #f0eee8; background: #ffffff0b; }
+.matrix .source-name.control-selected { border-radius: 1px; }
