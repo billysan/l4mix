@@ -192,7 +192,7 @@ main { grid-template-columns: minmax(0, 4fr) minmax(175px, 1fr); gap: 16px; padd
 .channel-select[aria-pressed=true] { color: var(--highlight); }
 .channel-effects { grid-column: 2; grid-row: 1 / span var(--workspace-rows, 3); display: grid; grid-template-columns: minmax(75px, .7fr) minmax(0, 2fr); gap: 12px; align-content: start; }
 .effect-group { border: 1px solid var(--line); background: var(--panel); min-width: 0; }
-.effect-group h2 { height: 29px; display: flex; align-items: center; justify-content: center; text-align: center; padding: 0 12px; margin: 0; font: 10px var(--font); letter-spacing: 1px; color: var(--text); background: var(--header); border-bottom: 1px solid var(--line); }
+.effect-group h2 { height: 29px; display: flex; align-items: center; justify-content: center; text-align: center; padding: 0 4px; margin: 0; font: 10px var(--font); letter-spacing: 1px; color: var(--text); background: var(--header); border-bottom: 1px solid var(--line); }
 .effect-knobs { display: grid; grid-template-columns: repeat(auto-fit, minmax(63px, 1fr)); padding: 12px 6px; row-gap: 12px; }
 .group-opacity { grid-column: 1; }
 .group-rgb { grid-column: 2; }

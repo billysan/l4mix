@@ -14,7 +14,7 @@ export const PARAMETERS = [
   { key: 'edgeAmount', label: 'AMOUNT', min: 0, max: 1, step: .01, initial: 0, unit: '%', scale: 100 },
   { key: 'edgeThreshold', label: 'THRESHOLD', min: 0, max: 1, step: .01, initial: .1, unit: '%', scale: 100 },
   { key: 'edgeWidth', label: 'WIDTH', min: 1, max: 8, step: 1, initial: 1, unit: 'px' },
-  { key: 'rotation', label: 'ROTATE', min: 0, max: 360, step: 1, initial: 0, unit: '°' },
+  { key: 'rotation', label: '🎡 ROTATE', min: 0, max: 360, step: 1, initial: 0, unit: '°' },
   ...['redX', 'redY', 'greenX', 'greenY', 'blueX', 'blueY', 'slideX', 'slideY'].map(key => ({
     key, label: ({redX: 'R X', redY: 'R Y', greenX: 'G X', greenY: 'G Y', blueX: 'B X', blueY: 'B Y', slideX: 'X', slideY: 'Y'})[key],
     min: -1, max: 1, step: .001, initial: 0, unit: '%', scale: 100, signed: true,

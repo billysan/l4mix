@@ -88,20 +88,20 @@ function knob(parameter, owner) {
 }
 
 const EFFECT_GROUPS = [
-  ['OPACITY', ['opacity']],
-  ['RGB', ['red', 'green', 'blue']],
-  ['COLORS', ['brightness', 'contrast', 'saturation', 'hue']],
-  ['EFFECTS', ['inversion', 'mirrorX', 'mirrorY', 'pixelation']],
-  ['RGB SHIFT', ['redX', 'redY', 'greenX', 'greenY', 'blueX', 'blueY']],
-  ['SLIDE', ['slideX', 'slideY', 'rotation']],
+  ['OPACITY', ['opacity'], '👻 OPACITY'],
+  ['RGB', ['red', 'green', 'blue'], '🔴🟢🔵 RGB'],
+  ['COLORS', ['brightness', 'contrast', 'saturation', 'hue'], '🎨 COLORS'],
+  ['EFFECTS', ['inversion', 'mirrorX', 'mirrorY', 'pixelation'], '🧪 FX'],
+  ['RGB SHIFT', ['redX', 'redY', 'greenX', 'greenY', 'blueX', 'blueY'], '🧲 RGB SHIFT'],
+  ['SLIDE', ['slideX', 'slideY', 'rotation'], '🎡 SLIDE'],
   ['EDGE', ['edgeAmount', 'edgeThreshold', 'edgeWidth']],
 ];
 function effectPanel(owner) {
   const panel = document.createElement('div'); panel.className = 'channel-effects'; owner.panel = panel;
   panel.setAttribute('aria-label', owner.id === 'master' ? 'Master effects' : `Source ${owner.number} effects`);
-  for (const [name, keys] of EFFECT_GROUPS) {
+  for (const [name, keys, title = name] of EFFECT_GROUPS) {
     const group = document.createElement('section'); group.className = `effect-group group-${name.toLowerCase().replaceAll(' ', '-')}`;
-    const heading = document.createElement('h2'); heading.textContent = name; group.append(heading);
+    const heading = document.createElement('h2'); heading.textContent = title; group.append(heading);
     const grid = document.createElement('div'); grid.className = 'effect-knobs';
     for (const key of keys) grid.append(knob(PARAMETERS.find(p => p.key === key), owner));
     group.append(grid); panel.append(group);
