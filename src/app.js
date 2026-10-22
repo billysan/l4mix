@@ -112,8 +112,6 @@ function selectChannel(owner) {
     item.row.classList.toggle('channel-selected', selected);
     item.selector.setAttribute('aria-pressed', selected);
   }
-  $('#channel-kind').textContent = owner === master ? 'MASTER' : `SOURCE ${String(owner.number).padStart(2, '0')}`;
-  $('#channel-title').textContent = owner === master ? 'MASTER' : owner.file.name;
 }
 function channelSelector(owner, cell, text) {
   const button = document.createElement('button'); button.className = 'channel-select'; button.textContent = text;
