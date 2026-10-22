@@ -1,6 +1,6 @@
 // Runs before styles load so a saved palette is applied before the first paint.
 (() => {
-  const colors = { classic: '#141414', dark: '#090a0c', sunset: '#1d1420', tropicana: '#0d1c1b' };
+  const colors = { classic: '#141414', dark: '#090a0c', sunset: '#1d1420', tropicana: '#1a1410' };
   const key = 'mist-theme';
   const valid = value => Object.hasOwn(colors, value) ? value : 'classic';
   function apply(value) {

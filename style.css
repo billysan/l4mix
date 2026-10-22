@@ -54,13 +54,15 @@
   --changed-border: #f4bb93; --master-knob-top: #79505a; --master-knob-bottom: #49323e; --selected-line: #ffc58d;
 }
 :root[data-theme=tropicana] {
-  --bg: #0d1c1b; --panel: #152b29; --header: #1c3a35; --source-header: #19322e;
-  --master-panel: #1d3632; --selected-panel: #2c4938; --table-line: #3e7462; --grid: #96d6a013;
-  --text: #f1f6dd; --subtle: #ccdfcd; --muted: #a6c0b1; --accent: #f3ce7e; --highlight: #ffffed;
-  --line: #31534a; --edge: #4d7568; --button: #203b34; --button-strong: #244339;
-  --button-hover: #2b4f43; --input: #19332d; --well: #0c211c;
-  --knob-top: #3c5c4e; --knob-bottom: #1d332d; --knob-border: #8aa98a; --knob-ring: #4b6e5a;
-  --changed-border: #f3ce7e; --master-knob-top: #4d6d53; --master-knob-bottom: #2c4436; --selected-line: #f1cb78;
+  /* Tiki Love Dark: carved wood, torch orange, bamboo green and palm sage. */
+  --bg: #1a1410; --panel: #231c15; --header: #30251b; --source-header: #2a2118;
+  --master-panel: #31261d; --selected-panel: #3d2d1e; --table-line: #4a5440; --grid: #8a9a6a10;
+  --text: #e8d5b7; --subtle: #a0b08a; --muted: #8a9a6a; --accent: #f0a84c; --highlight: #f4e8d0;
+  --line: #3d3528; --edge: #63503a; --button: #34271b; --button-strong: #3c2b1d;
+  --button-hover: #4a3521; --input: #261e16; --well: #17120e;
+  --knob-top: #57402a; --knob-bottom: #2b2118; --knob-border: #8a9a6a; --knob-ring: #4a5440;
+  --changed-border: #d4843e; --master-knob-top: #65492e; --master-knob-bottom: #38291b; --selected-line: #f0a84c;
+  --error: #e85a4f; --signal: #6aaf5c;
 }
 * { box-sizing: border-box; }
 body { margin: 0; background: var(--bg); color: var(--text); font-size: 12px; }
@@ -92,7 +94,7 @@ main { display: grid; grid-template-columns: minmax(0, 4fr) minmax(200px, 1fr); 
 .source-details { flex: 1; min-width: 0; }
 .source-details strong { display: block; font-size: 10px; font-weight: 400; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .source-details small { display: block; font-size: 8px; margin-top: 6px; color: var(--subtle); white-space: nowrap; }
-.source-details small.error { color: var(--highlight); }
+.source-details small.error { color: var(--error, var(--highlight)); }
 .transport { display: grid; grid-template-columns: 15px 15px 15px 32px; align-items: center; gap: 3px; margin-top: 9px; }
 .transport .reset-button { grid-column: 4; padding: 4px 2px; width: 32px; font-size: 8px; letter-spacing: .2px; }
 .icon-button { background: none; border: 0; color: var(--subtle); padding: 1px 2px; font-size: 13px; line-height: 1; min-width: 15px; }
@@ -134,7 +136,7 @@ select { background: var(--input); color: var(--text); border: 1px solid var(--e
 .output-button { display: flex; width: 100%; align-items: center; justify-content: space-between; margin-top: 12px; }
 .output-button span { font-size: 15px; }
 .signal-label { font-size: 8px; color: var(--muted); letter-spacing: .4px; }
-.signal-label.active { color: var(--text); }
+.signal-label.active { color: var(--signal, var(--text)); }
 .performance { display: flex; align-items: center; flex-wrap: wrap; gap: 6px; padding-top: 12px; border-top: 1px solid var(--line); color: var(--subtle); font-size: 7px; }
 .performance #fps, .performance #dropped { color: var(--subtle); font-size: 10px; }
 .live-dot { display: inline-block; width: 5px; height: 5px; background: var(--subtle); border-radius: 50%; }

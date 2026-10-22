@@ -35,7 +35,7 @@ The mixer interface is scaled to **140%**. Set Chrome’s page zoom to **100%** 
 
 ## Themes
 
-Choose **THEME** below the monitor: **CLASSIC** keeps the original gray dashboard and subtle red table grid; **DARK** uses near-black slate; **SUNSET** uses plum and warm peach; **TROPICANA** uses deep teal, green and sand accents. All keep the BigBlueTerm font and centered headings.
+Choose **THEME** below the monitor: **CLASSIC** keeps the original gray dashboard and subtle red table grid; **DARK** uses near-black slate; **SUNSET** uses plum and warm peach; **TROPICANA** follows [Tiki Love Dark by k00k](https://ghostty-style.vercel.app/config/tiki-love-dark): warm wood browns, torch orange, bamboo green and palm sage. All keep the BigBlueTerm font and centered headings.
 
 The selection is saved locally and restored before the first paint, and open mixer tabs stay in sync. If browser storage is blocked, themes still work for the session. Unknown saved values fall back to CLASSIC. Themes affect interface colors only; video output, loaded clips, effects, mapping, resolution and transport are unchanged. RESET retains the chosen theme.
 
