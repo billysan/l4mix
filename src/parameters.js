@@ -12,6 +12,7 @@ export const PARAMETERS = [
   { key: 'mirrorY', label: 'CLONE Y', min: 1, max: 16, step: 1, initial: 1, unit: '×' },
   { key: 'hue', label: 'HUE', min: -180, max: 180, step: 1, initial: 0, unit: '°', signed: true },
   { key: 'pixelation', label: 'PIXELATE', min: 1, max: 128, step: 1, initial: 1, unit: 'px' },
+  { key: 'rotation', label: 'ROTATE', min: 0, max: 360, step: 1, initial: 0, unit: '°' },
   ...['redX', 'redY', 'greenX', 'greenY', 'blueX', 'blueY', 'slideX', 'slideY'].map(key => ({
     key, label: ({redX: 'R X', redY: 'R Y', greenX: 'G X', greenY: 'G Y', blueX: 'B X', blueY: 'B Y', slideX: 'X', slideY: 'Y'})[key],
     min: -1, max: 1, step: .001, initial: 0, unit: '%', scale: 100, signed: true,

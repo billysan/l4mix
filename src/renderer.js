@@ -15,12 +15,17 @@ uniform vec2 outputSize;
 uniform float opacity, mirrorX, mirrorY, pixelation;
 uniform mat3 colorMatrix;
 uniform vec3 colorOffset;
-uniform vec2 slide, redShift, greenShift, blueShift;
+uniform vec2 slide, redShift, greenShift, blueShift, rotationCS;
 uniform bool splitChannels;
 uniform bool master;
 uniform bool mappingEnabled;
 uniform mat3 mappingMatrix;
 vec4 readImage(vec2 p) {
+  if (rotationCS.x != 1. || rotationCS.y != 0.) {
+    vec2 centered = (p - .5) * outputSize;
+    p = vec2(rotationCS.x * centered.x - rotationCS.y * centered.y,
+             rotationCS.y * centered.x + rotationCS.x * centered.y) / outputSize + .5;
+  }
   if (any(lessThan(p, vec2(0.))) || any(greaterThan(p, vec2(1.)))) return vec4(0.);
   if (!master) {
     float sourceAspect = sourceSize.x / sourceSize.y;
@@ -80,7 +85,7 @@ export class Renderer {
       if (!gl.getShaderParameter(shader, gl.COMPILE_STATUS)) { const log = gl.getShaderInfoLog(shader); gl.deleteShader(shader); throw new Error(`Video shader failed: ${log}`); }
       return shader;
     };
-    const keys = ['image', 'sourceSize', 'outputSize', 'master', 'opacity', 'mirrorX', 'mirrorY', 'pixelation', 'colorMatrix', 'colorOffset', 'mappingEnabled', 'mappingMatrix', 'slide', 'redShift', 'greenShift', 'blueShift'];
+    const keys = ['image', 'sourceSize', 'outputSize', 'master', 'opacity', 'mirrorX', 'mirrorY', 'pixelation', 'colorMatrix', 'colorOffset', 'mappingEnabled', 'mappingMatrix', 'slide', 'redShift', 'greenShift', 'blueShift', 'rotationCS'];
     this.variants = [false, true].map(split => {
       const vs = compile(gl.VERTEX_SHADER, vertex);
       // Specialize the zero-shift path so software GL does not pay for three samples.
@@ -127,6 +132,8 @@ export class Renderer {
     gl.bindTexture(gl.TEXTURE_2D, texture);
     gl.uniform2f(this.uniforms.sourceSize, ...size); gl.uniform1i(this.uniforms.master, master ? 1 : 0);
     for (const [key, value] of Object.entries(values)) if (this.uniforms[key] != null) gl.uniform1f(this.uniforms[key], value);
+    const angle = ((values.rotation || 0) % 360) * Math.PI / 180;
+    gl.uniform2f(this.uniforms.rotationCS, Math.cos(angle), Math.sin(angle));
     gl.uniform2f(this.uniforms.slide, values.slideX || 0, values.slideY || 0);
     gl.uniform2f(this.uniforms.redShift, values.redX || 0, values.redY || 0);
     gl.uniform2f(this.uniforms.greenShift, values.greenX || 0, values.greenY || 0);
@@ -157,7 +164,7 @@ export class Renderer {
     const result = { signature, matrix, offset }; this.colorCache.set(v, result); return result;
   }
   isNeutral(v) {
-    return v.opacity === 1 && v.inversion === 0 && v.brightness === 0 && v.contrast === 1 && v.saturation === 1 && v.red === 1 && v.green === 1 && v.blue === 1 && v.mirrorX === 1 && v.mirrorY === 1 && v.hue === 0 && v.pixelation === 1 && ['slideX', 'slideY', 'redX', 'redY', 'greenX', 'greenY', 'blueX', 'blueY'].every(key => !v[key]);
+    return v.opacity === 1 && v.inversion === 0 && v.brightness === 0 && v.contrast === 1 && v.saturation === 1 && v.red === 1 && v.green === 1 && v.blue === 1 && v.mirrorX === 1 && v.mirrorY === 1 && v.hue === 0 && v.pixelation === 1 && !(v.rotation % 360) && ['slideX', 'slideY', 'redX', 'redY', 'greenX', 'greenY', 'blueX', 'blueY'].every(key => !v[key]);
   }
   render(sources, master, mapping = null) {
     if (this.lost) return false;

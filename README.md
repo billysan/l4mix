@@ -46,9 +46,10 @@ Every channel has the same fixed chain; the workspace grouping is for navigation
 | Hue | −180° to +180° | 0° |
 | Pixelate | 1–128 source pixels per block | 1 px (off) |
 | R / G / B X and Y | −100 to +100% of the output width / height | 0% |
+| Rotate (in SLIDE) | 0–360°, clockwise around the picture center | 0° |
 | Slide X and Y | −100 to +100% of the output width / height | 0% |
 
-RGB shifts and slide leave empty edges without wrapping. Empty source areas reveal the mix underneath; empty master areas are black. All eight shift controls start at zero and participate in channel and global resets. Neutral RGB shift uses one texture sample; enabled RGB separation uses three in the same shader pass.
+RGB shifts, slide and rotation leave empty edges without wrapping. Rotation preserves proportions at rectangular output resolutions, then slide moves the rotated picture. Empty source areas reveal the mix underneath; empty master areas are black. The eight shift controls and rotation start at zero and participate in channel and global resets. Neutral RGB shift uses one texture sample; enabled RGB separation uses three in the same shader pass.
 
 Clips retain their aspect ratio and fit within the canvas. Empty areas are transparent while layering, with black behind the finished mix. Master effects also affect that black background.
 

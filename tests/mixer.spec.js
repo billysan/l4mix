@@ -357,7 +357,7 @@ test('Ctrl+arrows navigate channel controls and knobs without changing their val
   await move('ArrowDown'); await expect(master.getByRole('button', { name: 'Pause all sources', exact: true })).toBeFocused();
   await move('ArrowUp'); await expect(second.getByRole('button', { name: 'Eject / replace video', exact: true })).toBeFocused();
   await second.locator('[role=slider]').nth(0).focus();
-  for (let i = 0; i < 19; i++) await move('ArrowRight');
+  for (let i = 0; i < 20; i++) await move('ArrowRight');
   const last = second.locator('[role=slider]').last(); await expect(last).toBeFocused();
   expect(await last.evaluate(el => { const b = el.getBoundingClientRect(); return el.contains(document.elementFromPoint(b.x + b.width / 2, b.y + b.height / 2)); })).toBe(true);
   await expect(page.locator('.control-selected')).toHaveCount(1);
@@ -478,4 +478,38 @@ test('telemetry displays system readings and handles unavailable counters', asyn
   await expect(page.locator('#memory-use')).toHaveText('2.0 / 8.0 GiB');
   await page.route('**/api/telemetry', route => route.fulfill({ status: 503, body: 'Unavailable' }));
   await expect(page.locator('#cpu-load')).toHaveText('—'); await expect(page.locator('#memory-use')).toHaveText('—');
+});
+
+test('rotation turns rectangular frames clockwise without stretching or wrapping and resets per channel', async ({ page }) => {
+  await page.goto('/');
+  const pixels = await page.evaluate(async () => {
+    const { Renderer } = await import('/src/renderer.js'), { defaults } = await import('/src/parameters.js');
+    const output = document.createElement('canvas'); output.width = 16; output.height = 8; const r = new Renderer(output);
+    const image = document.createElement('canvas'); image.width = 16; image.height = 8; const ctx = image.getContext('2d');
+    for (const [color, x, y] of [['red',0,0], ['lime',8,0], ['blue',0,4], ['white',8,4]]) { ctx.fillStyle = color; ctx.fillRect(x,y,8,4); }
+    Object.defineProperties(image, { videoWidth: { value: 16 }, videoHeight: { value: 8 }, readyState: { value: 4 } });
+    const source = { id: 'pattern', video: image, values: { ...defaults(), opacity: 1 }, dirty: true }, master = defaults(true);
+    const pixel = (x,y) => { const bytes = new Uint8Array(4); r.gl.readPixels(x,7-y,1,1,r.gl.RGBA,r.gl.UNSIGNED_BYTE,bytes); return [...bytes]; };
+    source.values.rotation = 90; r.render([source], master);
+    const quarter = { inside: pixel(5,1), outside: pixel(1,1) };
+    source.values.rotation = 180; r.render([source], master); const half = pixel(1,1);
+    source.values.rotation = 360; r.render([source], master); const full = pixel(1,1);
+    source.values.rotation = 0; r.render([source], { ...master, rotation: 90 }); const masterQuarter = pixel(5,1), masterOutside = pixel(1,1);
+    const neutral = r.isNeutral({ ...master, rotation: 360 }), nonNeutral = r.isNeutral({ ...master, rotation: 90 });
+    r.dispose(); return { quarter, half, full, masterQuarter, masterOutside, neutral, nonNeutral };
+  });
+  expect(pixels.quarter.inside).toEqual([0,0,255,255]); expect(pixels.quarter.outside).toEqual([0,0,0,255]);
+  expect(pixels.half).toEqual([255,255,255,255]); expect(pixels.full).toEqual([255,0,0,255]);
+  expect(pixels.masterQuarter).toEqual([0,0,255,255]); expect(pixels.masterOutside).toEqual([0,0,0,255]);
+  expect(pixels.neutral).toBe(true); expect(pixels.nonNeutral).toBe(false);
+  await page.locator('#file-input').setInputFiles(await clip(page));
+  const row = page.locator('.source-row'), rotation = row.locator('[data-parameter=rotation] .knob');
+  await expect(rotation).toHaveAttribute('aria-valuenow', '0');
+  const input = row.locator('[data-parameter=rotation] input'); await input.fill('90'); await input.press('Enter');
+  await expect(rotation).toHaveAttribute('aria-valuenow', '90');
+  await row.getByRole('button', { name: 'Reset source effects', exact: true }).click(); await expect(rotation).toHaveAttribute('aria-valuenow', '0');
+  await page.locator('.master .channel-select').click();
+  const masterRotation = page.locator('.master [data-parameter=rotation] .knob');
+  await masterRotation.focus(); await masterRotation.press('End'); await expect(masterRotation).toHaveAttribute('aria-valuenow', '360');
+  await page.locator('#reset-all').click(); await expect(masterRotation).toHaveAttribute('aria-valuenow', '0');
 });

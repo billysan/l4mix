@@ -170,7 +170,7 @@ main { grid-template-columns: minmax(0, 4fr) minmax(175px, 1fr); gap: 16px; padd
 }
 .group-rgb-shift, .group-slide { grid-column: 1 / -1; }
 .group-rgb-shift .effect-knobs { grid-template-columns: repeat(6, minmax(0, 1fr)); }
-.group-slide .effect-knobs { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+.group-slide .effect-knobs { grid-template-columns: repeat(3, minmax(0, 1fr)); }
 @media (max-width: 600px) { .group-rgb-shift .effect-knobs { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
 .system-stats { display: grid; gap: 10px; margin: 0; padding-top: 12px; border-top: 1px solid var(--line); font: 8px Consolas, 'Liberation Mono', monospace; color: #ccc; }
 .system-stats > div { display: flex; justify-content: space-between; gap: 8px; }

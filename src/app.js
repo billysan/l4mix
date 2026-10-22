@@ -93,7 +93,7 @@ const EFFECT_GROUPS = [
   ['COLORS', ['brightness', 'contrast', 'saturation', 'hue']],
   ['EFFECTS', ['inversion', 'mirrorX', 'mirrorY', 'pixelation']],
   ['RGB SHIFT', ['redX', 'redY', 'greenX', 'greenY', 'blueX', 'blueY']],
-  ['SLIDE', ['slideX', 'slideY']],
+  ['SLIDE', ['slideX', 'slideY', 'rotation']],
 ];
 function effectPanel(owner) {
   const panel = document.createElement('div'); panel.className = 'channel-effects'; owner.panel = panel;
