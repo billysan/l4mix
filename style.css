@@ -3,8 +3,8 @@
   color-scheme: dark;
   --bg: #141414;
   --panel: #1d1d1d;
-  --line: #573333;
-  --edge: #754949;
+  --line: #3a3a3a;
+  --edge: #555;
   --muted: #bbb;
   --text: #f0eee8;
   --accent: #e4e1d8;
@@ -52,10 +52,10 @@ main { display: grid; grid-template-columns: minmax(0, 4fr) minmax(200px, 1fr); 
 .row-operations .icon-button { font-size: 11px; }
 .knob-cell { display: flex; flex-direction: column; justify-content: center; align-items: center; gap: 9px; }
 .knob-cell.mix { border-right: 1px solid var(--line); background: #ffffff03; }
-.knob { width: 32px; height: 32px; border: 1px solid #946969; border-radius: 50%; background: linear-gradient(145deg, #444, #272727); box-shadow: 0 2px 3px #0008, inset 0 1px 1px #ffffff15; cursor: ns-resize; position: relative; touch-action: none; outline: none; }
-.knob::before { content: ''; position: absolute; inset: -4px; border: 1px solid #633d3d; border-bottom-color: transparent; border-radius: 50%; pointer-events: none; }
+.knob { width: 32px; height: 32px; border: 1px solid #777; border-radius: 50%; background: linear-gradient(145deg, #444, #272727); box-shadow: 0 2px 3px #0008, inset 0 1px 1px #ffffff15; cursor: ns-resize; position: relative; touch-action: none; outline: none; }
+.knob::before { content: ''; position: absolute; inset: -4px; border: 1px solid #424242; border-bottom-color: transparent; border-radius: 50%; pointer-events: none; }
 .knob:hover, .knob:focus-visible, .knob.dragging { border-color: #eee; box-shadow: 0 0 0 3px #ffffff0c; }
-.knob.is-changed { border-color: #d6b8b8; }
+.knob.is-changed { border-color: #d9d9d9; }
 .knob-indicator { position: absolute; inset: 0; transform: rotate(var(--rotation)); pointer-events: none; }
 .knob-indicator::after { content: ''; position: absolute; width: 2px; height: 9px; top: 3px; left: calc(50% - 1px); background: #e4e1d8; border-radius: 1px; }
 .knob-value { appearance: none; width: 50px; padding: 2px 0; text-align: center; background: transparent; border: 1px solid transparent; border-radius: 2px; color: #ccc; font-size: 8px; }
@@ -92,7 +92,7 @@ select { background: #262626; color: var(--text); border: 1px solid var(--edge);
 .live-dot.slow { background: #777; }
 .performance-separator { margin: 0 3px; color: #777; }
 .messages { position: fixed; right: 20px; bottom: 20px; max-width: 440px; display: flex; flex-direction: column; gap: 8px; z-index: 10; }
-.message { display: flex; align-items: flex-start; gap: 16px; background: #2b2b2b; border: 1px solid #946969; padding: 12px; color: #ddd; border-radius: 2px; box-shadow: 0 4px 20px #0008; font-size: 11px; line-height: 1.5; }
+.message { display: flex; align-items: flex-start; gap: 16px; background: #2b2b2b; border: 1px solid #777; padding: 12px; color: #ddd; border-radius: 2px; box-shadow: 0 4px 20px #0008; font-size: 11px; line-height: 1.5; }
 .message button { background: none; border: 0; color: #ccc; font-size: 18px; line-height: 1; }
 @media (max-width: 1050px) {
   main { grid-template-columns: minmax(0, 1fr) 200px; gap: 16px; padding: 16px; }
@@ -132,7 +132,7 @@ select { background: #262626; color: var(--text); border: 1px solid var(--edge);
 /* One selected channel, with a shared, grouped workspace. */
 main { grid-template-columns: minmax(0, 4fr) minmax(175px, 1fr); gap: 16px; padding: 16px; }
 .matrix-scroll { overflow: visible; border: 0; scroll-padding: 0; }
-.matrix { display: grid; grid-template-columns: 212px minmax(0, 1fr); grid-template-rows: 48px repeat(var(--channel-count, 1), 112px) 1fr; gap: 0 16px; min-width: 0; min-height: 480px; }
+.matrix { --line: #573333; display: grid; grid-template-columns: 212px minmax(0, 1fr); grid-template-rows: 48px repeat(var(--channel-count, 1), 112px) 1fr; gap: 0 16px; min-width: 0; min-height: 480px; }
 .matrix-columns, .matrix-row, #source-rows, #master-row { display: contents; }
 .source-column-label { position: static; grid-column: 1; grid-row: 1; border: 1px solid var(--line); }
 .source-cell { grid-column: 1; grid-row: var(--channel-row, 2); position: relative; border: 1px solid var(--line); border-top: 0; cursor: pointer; }

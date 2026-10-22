@@ -182,7 +182,7 @@ test('compact grayscale layout and four-corner output mapping', async ({ page },
   await expect(page.locator('#reset-all')).toHaveText('RESET');
   expect(await page.evaluate(() => Number(getComputedStyle(document.documentElement).zoom))).toBe(1.4);
   await expect(page.locator('label[for=resolution]')).toContainText('RESOLUTION');
-  const color = await page.locator('.channel-effects:not([hidden]) .knob').first().evaluate(el => getComputedStyle(el).borderColor);
+  const color = await page.locator('.channel-effects:not([hidden]) .effect-group').first().evaluate(el => getComputedStyle(el).borderColor);
   const rgb = color.match(/\d+/g).map(Number); expect(rgb[0]).toBeGreaterThan(rgb[1]); expect(rgb[1]).toBe(rgb[2]); expect(rgb[0] - rgb[1]).toBeLessThan(60);
   const handles = page.locator('.mapping-handle'); await expect(handles.first()).toBeHidden();
   await page.locator('#mapping-toggle').check(); await expect(handles).toHaveCount(4); await expect(handles.first()).toBeVisible();
