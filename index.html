@@ -11,9 +11,9 @@
     <section class="mixer-section" aria-label="Video control matrix" id="drop-zone">
       <input id="file-input" type="file" accept="video/*,.mkv,.mov,.webm,.mp4,.m4v,.ogv" multiple hidden>
       <input id="replace-input" type="file" accept="video/*,.mkv,.mov,.webm,.mp4,.m4v,.ogv" hidden>
-      <div class="matrix-scroll" tabindex="0" aria-label="Scrollable parameter matrix">
+      <div class="matrix-scroll" tabindex="0" aria-label="Sources and selected channel effects">
         <div class="matrix" id="matrix">
-          <div class="matrix-columns" id="column-headings"><div class="source-column-label"><span>SOURCE</span><span id="source-count" class="source-count">0 / 2</span><button id="empty-add" class="add-source" aria-label="Add videos" title="Add videos">+</button></div></div>
+          <div class="matrix-columns" id="column-headings"><div class="source-column-label"><span>SOURCE</span><span id="source-count" class="source-count">0 / 2</span><button id="empty-add" class="add-source" aria-label="Add videos" title="Add videos">+</button></div><header class="channel-heading"><span id="channel-kind">MASTER</span><h1 id="channel-title">MASTER</h1></header></div>
           <div id="source-rows"></div>
           <div id="master-row"></div>
         </div>

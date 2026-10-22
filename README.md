@@ -1,6 +1,6 @@
 # MIST
 
-A local two-source video mixer with a matrix of knobs. Load clips, turn up their opacity, and process each source and the final mix independently.
+A local two-source video mixer with a selected-channel knob workspace. Load clips, turn up their opacity, and process each source and the final mix independently.
 
 ## Run
 
@@ -16,9 +16,10 @@ Open **http://localhost:5173**. No installation is needed to run the mixer. The 
 
 - Drop up to **two video files** onto the window, or click the **+** beside **SOURCE**. Browser codec support determines which files play; MP4 and WebM are good starting points.
 - Each source starts at **0% opacity**. Raise opacity to bring it into the mix. The master starts at 100%. Sources use screen blending: at 100%, each source combines with the others instead of hiding them. Black contributes nothing; opacity controls the strength of each source.
+- Select a source or **MASTER** in the left list to show its controls in the central grid. Each channel retains its own settings. **OPACITY** is separate, **RGB** groups the three gains, **COLORS** contains brightness, contrast, saturation and hue, and **EFFECTS** holds invert, cloning and pixelation. The selected filename appears above the workspace.
 - **Ctrl+Left/Right** moves between source controls and knobs. **Ctrl+Up/Down** moves between source rows and MASTER, keeping the same parameter or closest available control. Click a control or press Ctrl+an arrow from the page to start; the selected control has a bright outline and scrolls into view. Plain arrows adjust knobs, and text fields retain normal Ctrl+arrow text navigation.
 - Drag a knob up/down; hold Shift for finer movement. Use arrow keys, Page Up/Down, or Home/End with a focused knob. Double-click to reset. Click a displayed value to type a number; Enter commits and Escape cancels. Percentages are entered as 0–100.
-- Pause playback with the controls beside each source. The eject icon opens the replacement file picker; cancelling keeps the current clip. Clicking the filename also replaces its clip. Replacements retain that row’s effects and preview preference. The × button removes a source. Screen blending is independent of source order. Videos are muted.
+- Pause playback with the controls beside each source. The eject icon opens the replacement file picker; cancelling keeps the current clip. Clicking the filename selects its channel; use eject to replace its clip. Replacements retain that row’s effects and preview preference. The × button removes a source. Screen blending is independent of source order. Videos are muted.
 - Source previews start **off**. A centered eye button in each monitor tile reveals the existing video element, without opening another decoder. Turning the eye off avoids painting that preview; active clips still need decoding for the mix.
 - The **MASTER** row uses the same centered eye toggle as each source. Its pause button pauses all sources together and resumes only the ones that were playing. Its eye hides the large output monitor while preserving clean output. With that monitor hidden and no output window open, compositing stops until needed again.
 - The global **RESET** restores every source and master effect, hides mapping handles, and restores all four corners. Each source’s **RESET** only resets that source’s effects (including opacity to zero); the master’s **RESET** only resets the master. Loaded clips and their transport settings are retained.
@@ -32,7 +33,7 @@ The mixer interface is scaled to **140%**. Set Chrome’s page zoom to **100%** 
 
 ## Controls
 
-Every row has the same fixed chain. Spatial processing runs first, followed by RGB gains → brightness → contrast → saturation → hue rotation → inversion. Source opacity scales its contribution to the screen blend; master opacity fades the finished picture to black.
+Every channel has the same fixed chain; the workspace grouping is for navigation and does not change processing order. Spatial processing runs first, followed by RGB gains → brightness → contrast → saturation → hue rotation → inversion. Source opacity scales its contribution to the screen blend; master opacity fades the finished picture to black.
 
 | Control | Range | Neutral |
 | --- | --- | --- |

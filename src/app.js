@@ -12,6 +12,7 @@ const master = { id: 'master', values: defaults(true), controls: new Map(), paus
 let renderer, nextId = 1, replacementId = null, outputWindow = null, outputStream = null;
 let renderDirty = true, lastRender = -Infinity, lastStats = performance.now(), frames = 0, disposed = false;
 const canvas = $('#output');
+let selectedOwner = master;
 
 function message(text, persistent = false) {
   const item = document.createElement('div'); item.className = 'message';
@@ -31,7 +32,7 @@ try {
 }
 
 function knob(parameter, owner) {
-  const cell = document.createElement('div'); cell.className = `knob-cell ${parameter.group || ''}`;
+  const cell = document.createElement('div'); cell.className = `knob-cell ${parameter.group || ''}`; cell.dataset.parameter = parameter.key;
   const control = document.createElement('div'); control.className = 'knob'; control.tabIndex = 0; control.setAttribute('role', 'slider');
   control.setAttribute('aria-label', `${owner.id === 'master' ? 'Master' : 'Source ' + owner.number} ${parameter.label.toLowerCase()}`);
   control.setAttribute('aria-valuemin', parameter.min); control.setAttribute('aria-valuemax', parameter.max);
@@ -81,14 +82,49 @@ function knob(parameter, owner) {
     if (e.key === 'Enter') { input.blur(); control.focus(); }
     if (e.key === 'Escape') { input.value = formatParameter(parameter, owner.values[parameter.key]); input.blur(); control.focus(); }
   });
-  update(); cell.append(control, input); return cell;
+  const label = document.createElement('span'); label.className = 'parameter-label'; label.textContent = parameter.label;
+  update(); cell.append(label, control, input); return cell;
 }
 
-for (const p of PARAMETERS) {
-  const label = document.createElement('div'); label.textContent = p.label; label.className = `parameter-label ${p.group || ''}`; $('#column-headings').append(label);
+const EFFECT_GROUPS = [
+  ['OPACITY', ['opacity']],
+  ['RGB', ['red', 'green', 'blue']],
+  ['COLORS', ['brightness', 'contrast', 'saturation', 'hue']],
+  ['EFFECTS', ['inversion', 'mirrorX', 'mirrorY', 'pixelation']],
+];
+function effectPanel(owner) {
+  const panel = document.createElement('div'); panel.className = 'channel-effects'; owner.panel = panel;
+  panel.setAttribute('aria-label', owner.id === 'master' ? 'Master effects' : `Source ${owner.number} effects`);
+  for (const [name, keys] of EFFECT_GROUPS) {
+    const group = document.createElement('section'); group.className = `effect-group group-${name.toLowerCase()}`;
+    const heading = document.createElement('h2'); heading.textContent = name; group.append(heading);
+    const grid = document.createElement('div'); grid.className = 'effect-knobs';
+    for (const key of keys) grid.append(knob(PARAMETERS.find(p => p.key === key), owner));
+    group.append(grid); panel.append(group);
+  }
+  return panel;
+}
+function selectChannel(owner) {
+  selectedOwner = owner;
+  for (const item of [...sources, master]) {
+    const selected = item === owner;
+    item.panel.hidden = !selected;
+    item.row.classList.toggle('channel-selected', selected);
+    item.selector.setAttribute('aria-pressed', selected);
+  }
+  $('#channel-kind').textContent = owner === master ? 'MASTER' : `SOURCE ${String(owner.number).padStart(2, '0')}`;
+  $('#channel-title').textContent = owner === master ? 'MASTER' : owner.file.name;
+}
+function channelSelector(owner, cell, text) {
+  const button = document.createElement('button'); button.className = 'channel-select'; button.textContent = text;
+  button.setAttribute('aria-label', owner === master ? 'Select master' : `Select source ${owner.number}`);
+  button.onclick = () => selectChannel(owner); owner.selector = button;
+  cell.addEventListener('pointerdown', () => selectChannel(owner));
+  cell.addEventListener('focusin', () => selectChannel(owner));
+  return button;
 }
 const monitorPlaceholder = document.createElement('div'); monitorPlaceholder.className = 'monitor-placeholder'; monitorPlaceholder.innerHTML = icon('eyeOff'); monitorPlaceholder.hidden = true; canvas.after(monitorPlaceholder);
-const masterRow = document.createElement('div'); masterRow.className = 'matrix-row master'; masterRow.dataset.source = 'master';
+const masterRow = document.createElement('div'); masterRow.className = 'matrix-row master'; masterRow.dataset.source = 'master'; master.row = masterRow;
 const masterLabel = document.createElement('div'); masterLabel.className = 'source-cell';
 const masterThumb = document.createElement('div'); masterThumb.className = 'thumbnail master-thumbnail';
 const masterEye = iconButton('eye', 'Master monitor', () => {
@@ -96,15 +132,16 @@ const masterEye = iconButton('eye', 'Master monitor', () => {
 });
 masterEye.classList.add('preview-eye'); masterThumb.append(masterEye);
 const masterDetails = document.createElement('div'); masterDetails.className = 'source-details';
-masterDetails.innerHTML = '<strong>MASTER</strong><small id="master-status">IDLE</small>';
+masterDetails.append(channelSelector(master, masterLabel, 'MASTER'));
+const masterStatus = document.createElement('small'); masterStatus.id = 'master-status'; masterStatus.textContent = 'IDLE'; masterDetails.append(masterStatus);
 const masterTransport = document.createElement('div'); masterTransport.className = 'transport';
 const masterPlay = iconButton('pause', 'Pause all sources', toggleMasterPause);
 const masterReset = sourceButton('RESET', 'Reset master effects', () => reset(master)); masterReset.className = 'reset-button';
 masterTransport.append(masterPlay, masterReset); masterDetails.append(masterTransport);
 const masterOperations = document.createElement('div'); masterOperations.className = 'row-operations';
 masterLabel.append(masterThumb, masterDetails, masterOperations);
-masterRow.append(masterLabel, ...PARAMETERS.map(p => knob(p, master))); $('#master-row').append(masterRow);
-const navigation = controlNavigation($('#matrix'));
+masterRow.append(masterLabel, effectPanel(master)); $('#master-row').append(masterRow);
+const navigation = controlNavigation($('#matrix'), { selectChannel, owners: () => [...sources, master], selected: () => selectedOwner });
 
 function updateMaster() {
   setIcon(masterPlay, master.paused ? 'play' : 'pause', master.paused ? 'Resume all sources' : 'Pause all sources');
@@ -144,6 +181,8 @@ function updateRows() {
   }
   $('#source-count').textContent = `${sources.length} / ${MAX_SOURCES}`;
   $('#empty-add').disabled = sources.length >= MAX_SOURCES;
+  if (![...sources, master].includes(selectedOwner)) selectedOwner = sources[0] || master;
+  selectChannel(selectedOwner);
   renderDirty = true; updateMonitor(); updateMaster(); navigation.refresh();
 }
 function sourceButton(text, label, action) {
@@ -201,8 +240,8 @@ function createSource(file, existing = null) {
   source.eye = iconButton('eyeOff', 'Source preview', () => { source.preview = !source.preview; updateSourcePreview(source); }); source.eye.classList.add('preview-eye'); thumb.append(source.eye);
   const badge = document.createElement('span'); badge.className = 'source-badge'; badge.textContent = String(number).padStart(2, '0'); thumb.append(badge);
   const details = document.createElement('div'); details.className = 'source-details';
-  const nameButton = sourceButton('', 'Replace video', () => { replacementId = source.id; $('#replace-input').click(); }); nameButton.className = 'source-name';
-  const name = document.createElement('strong'); name.textContent = file.name; nameButton.title = `Replace ${file.name}`; nameButton.append(name);
+  const nameButton = channelSelector(source, cell, file.name); nameButton.classList.add('source-name'); nameButton.textContent = '';
+  const name = document.createElement('strong'); name.textContent = file.name; nameButton.title = `Select ${file.name}`; nameButton.append(name);
   const status = document.createElement('small'); status.textContent = 'LOADING…'; source.status = status;
   const transport = document.createElement('div'); transport.className = 'transport';
   const playButton = iconButton('pause', 'Pause video', togglePlayback); source.playButton = playButton;
@@ -211,7 +250,7 @@ function createSource(file, existing = null) {
   transport.append(playButton, eject, resetSource); details.append(nameButton, status, transport);
   const operations = document.createElement('div'); operations.className = 'row-operations';
   operations.append(sourceButton('×', 'Remove video', () => removeSource(source)));
-  cell.append(thumb, details, operations); row.append(cell, ...PARAMETERS.map(p => knob(p, source)));
+  cell.append(thumb, details, operations); row.append(cell, effectPanel(source));
   source.updateStatus = () => {
     if (source.error || source.removed) return;
     const paused = source.transport.paused;
@@ -238,9 +277,11 @@ function addFiles(files) {
   const list = Array.from(files);
   const accepted = list.filter(file => file.type.startsWith('video/') || /\.(mp4|m4v|mov|webm|ogv|ogg|mkv)$/i.test(file.name));
   if (accepted.length !== list.length) message('Only video files can be added.');
+  const wasEmpty = sources.length === 0;
   const slots = MAX_SOURCES - sources.length;
   if (accepted.length > slots) message('This version supports two videos at a time. Remove or replace a source to try another.');
   for (const file of accepted.slice(0, slots)) sources.push(createSource(file));
+  if (wasEmpty && sources.length) selectedOwner = sources[0];
   updateRows();
 }
 $('#empty-add').onclick = () => $('#file-input').click();
@@ -248,7 +289,7 @@ $('#file-input').onchange = e => { addFiles(e.target.files); e.target.value = ''
 $('#replace-input').onchange = e => {
   const file = e.target.files[0];
   const index = sources.findIndex(s => s.id === replacementId);
-  if (file && index >= 0) { const previous = sources[index]; sources[index] = createSource(file, previous); disposeSource(previous); updateRows(); }
+  if (file && index >= 0) { const previous = sources[index]; sources[index] = createSource(file, previous); if (selectedOwner === previous) selectedOwner = sources[index]; disposeSource(previous); updateRows(); }
   replacementId = null; e.target.value = '';
 };
 let dragDepth = 0;

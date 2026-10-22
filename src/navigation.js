@@ -1,80 +1,61 @@
-const KNOB_START = 6;
 const ARROWS = new Set(['ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown']);
 
-export function controlNavigation(matrix) {
-  let rows = [], selected = null, rowIndex = 0, preferredColumn = KNOB_START, moving = false;
+export function controlNavigation(matrix, channels) {
+  let selected = null, previousIndex = 0, preferred = 0, moving = false;
   const available = control => control?.isConnected && !control.disabled && control.getClientRects().length > 0;
-  const column = control => Number(control.dataset.navColumn);
-  function controls(row) {
-    return [...row.querySelectorAll('[data-nav-column]')].filter(available);
-  }
-  function closest(row, wanted) {
-    return controls(row).sort((a, b) => Math.abs(column(a) - wanted) - Math.abs(column(b) - wanted) || column(a) - column(b))[0];
-  }
+  const ownerOf = control => channels.owners().find(owner => owner.row.contains(control));
+  const controls = owner => [...owner.row.querySelectorAll('[data-nav-column]')].filter(available);
   function mark(control) {
-    selected?.classList.remove('control-selected');
-    selected = control;
+    selected?.classList.remove('control-selected'); selected = control;
     selected?.classList.add('control-selected');
   }
-  function select(control, rememberColumn = true) {
+  function select(control, remember = true) {
     if (!available(control)) return;
-    rowIndex = rows.indexOf(control.closest('.matrix-row'));
-    if (rememberColumn) preferredColumn = column(control);
-    moving = true;
-    control.focus({ preventScroll: true });
-    mark(control);
-    if (column(control) >= KNOB_START) control.scrollIntoView({ block: 'nearest', inline: 'nearest', behavior: 'instant' });
-    else control.closest('.matrix-row').scrollIntoView({ block: 'nearest', inline: 'nearest', behavior: 'instant' });
-    moving = false;
+    const owner = ownerOf(control); channels.selectChannel(owner);
+    previousIndex = channels.owners().indexOf(owner);
+    if (remember) preferred = Number(control.dataset.navColumn);
+    moving = true; control.focus({ preventScroll: true }); mark(control);
+    control.scrollIntoView({ block: 'nearest', inline: 'nearest' }); moving = false;
+  }
+  function closest(owner, column) {
+    return controls(owner).sort((a, b) => Math.abs(Number(a.dataset.navColumn) - column) - Math.abs(Number(b.dataset.navColumn) - column))[0];
   }
   function refresh() {
-    rows = [...matrix.querySelectorAll('.matrix-row')];
-    for (const row of rows) {
-      const general = [
-        row.querySelector('.preview-eye'),
-        row.querySelector('.source-name'),
-        row.querySelector('.transport .icon-button'),
-        row.querySelector('.transport .icon-button:nth-child(2)'),
-        row.querySelector('.transport .reset-button'),
-        row.querySelector('.row-operations button'),
-      ];
+    for (const owner of channels.owners()) {
+      const row = owner.row;
+      const general = [row.querySelector('.preview-eye'), row.querySelector('.channel-select'), row.querySelector('.transport .icon-button'), row.querySelector('.transport .icon-button:nth-child(2)'), row.querySelector('.reset-button'), row.querySelector('.row-operations button')];
       general.forEach((control, index) => { if (control) control.dataset.navColumn = index; });
-      row.querySelectorAll('.knob').forEach((control, index) => { control.dataset.navColumn = KNOB_START + index; });
+      row.querySelectorAll('.knob').forEach((control, index) => { control.dataset.navColumn = 6 + index; });
     }
     if (selected && !selected.isConnected) {
-      const row = rows[Math.min(rowIndex, rows.length - 1)];
-      select(row && closest(row, preferredColumn), false);
+      const owner = channels.owners()[Math.min(previousIndex, channels.owners().length - 1)];
+      channels.selectChannel(owner); select(closest(owner, preferred), false);
     }
   }
   document.addEventListener('focusin', event => {
     if (moving) return;
-    const target = event.target;
-    const control = matrix.contains(target) ? target.closest('[data-nav-column]') || target.closest('.knob-cell')?.querySelector('.knob') : null;
+    const control = matrix.contains(event.target) ? event.target.closest('[data-nav-column]') || event.target.closest('.knob-cell')?.querySelector('.knob') : null;
     if (!control) { selected?.classList.remove('control-selected'); return; }
-    rowIndex = rows.indexOf(control.closest('.matrix-row'));
-    preferredColumn = column(control); mark(control);
+    const owner = ownerOf(control); channels.selectChannel(owner);
+    previousIndex = channels.owners().indexOf(owner); preferred = Number(control.dataset.navColumn); mark(control);
   });
   document.addEventListener('keydown', event => {
     if (!event.ctrlKey || event.altKey || event.metaKey || event.shiftKey || !ARROWS.has(event.key)) return;
     const active = document.activeElement;
-    // Preserve text editing, selects, and controls outside the source matrix.
     if (active.matches('input, textarea, select') || active.isContentEditable) return;
     if (!matrix.contains(active) && active !== matrix.parentElement && active !== document.body && active !== document.documentElement) return;
     event.preventDefault(); event.stopPropagation();
     const current = active.closest?.('[data-nav-column]');
-    if (!current || !available(current)) {
-      select(available(selected) ? selected : closest(rows[0], KNOB_START)); return;
-    }
-    const row = current.closest('.matrix-row'), index = rows.indexOf(row);
+    if (!current || !available(current)) { select(closest(channels.selected(), 6)); return; }
+    const owner = ownerOf(current);
     if (event.key === 'ArrowLeft' || event.key === 'ArrowRight') {
-      const choices = controls(row).sort((a, b) => column(a) - column(b));
+      const choices = controls(owner);
       const next = choices[choices.indexOf(current) + (event.key === 'ArrowRight' ? 1 : -1)];
       if (next) select(next);
     } else {
-      const nextRow = rows[index + (event.key === 'ArrowDown' ? 1 : -1)];
-      if (nextRow) select(closest(nextRow, preferredColumn), false);
+      const owners = channels.owners(), next = owners[owners.indexOf(owner) + (event.key === 'ArrowDown' ? 1 : -1)];
+      if (next) { channels.selectChannel(next); select(closest(next, preferred), false); }
     }
   }, true);
-  refresh();
-  return { refresh };
+  refresh(); return { refresh };
 }
