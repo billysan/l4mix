@@ -5,7 +5,7 @@ import { fileURLToPath } from 'node:url';
 import path from 'node:path';
 
 const root = path.dirname(fileURLToPath(import.meta.url));
-const types = { '.html': 'text/html', '.js': 'text/javascript', '.css': 'text/css', '.svg': 'image/svg+xml', '.json': 'application/json' };
+const types = { '.html': 'text/html', '.js': 'text/javascript', '.css': 'text/css', '.svg': 'image/svg+xml', '.json': 'application/json', '.ttf': 'font/ttf', '.txt': 'text/plain; charset=utf-8', '.md': 'text/plain; charset=utf-8' };
 const port = Number(process.env.PORT || 5173);
 http.createServer(async (req, res) => {
   try {
@@ -15,7 +15,7 @@ http.createServer(async (req, res) => {
       res.end(JSON.stringify(await systemTelemetry())); return;
     }
     const file = path.resolve(root, `.${pathname === '/' ? '/index.html' : pathname}`);
-    if (!file.startsWith(root + path.sep) || (!['index.html', 'output.html', 'style.css', 'favicon.svg'].includes(path.relative(root, file)) && !file.startsWith(path.join(root, 'src') + path.sep))) {
+    if (!file.startsWith(root + path.sep) || (!['index.html', 'output.html', 'style.css', 'favicon.svg'].includes(path.relative(root, file)) && !file.startsWith(path.join(root, 'src') + path.sep) && !file.startsWith(path.join(root, 'assets', 'fonts') + path.sep))) {
       res.writeHead(404).end('Not found'); return;
     }
     const data = await readFile(file);

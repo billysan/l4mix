@@ -1,9 +1,11 @@
 import { test, expect } from '@playwright/test';
 
 async function clip(page, width = 320, height = 180) {
+  await page.evaluate(async () => { await document.fonts.ready; await new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve))); });
   const bytes = await page.evaluate(async ({ width, height }) => {
     const c = document.createElement('canvas'); c.width = width; c.height = height;
-    const ctx = c.getContext('2d'); const stream = c.captureStream(30);
+    const ctx = c.getContext('2d'); const stream = c.captureStream(0);
+    const track = stream.getVideoTracks()[0];
     const recorder = new MediaRecorder(stream, { mimeType: 'video/webm;codecs=vp8' });
     const chunks = []; recorder.ondataavailable = e => chunks.push(e.data);
     const done = new Promise(resolve => { recorder.onstop = resolve; }); recorder.start();
@@ -11,7 +13,8 @@ async function clip(page, width = 320, height = 180) {
       ctx.fillStyle = '#d05b32'; ctx.fillRect(0, 0, width / 2, height);
       ctx.fillStyle = '#588fc4'; ctx.fillRect(width / 2, 0, width / 2, height);
       ctx.fillStyle = '#d8fa77'; ctx.fillRect((i / 18) * width, height / 4, width / 8, height / 2);
-      await new Promise(r => setTimeout(r, 34));
+      track.requestFrame();
+      await new Promise(r => requestAnimationFrame(() => setTimeout(r, 34)));
     }
     recorder.stop(); await done; stream.getTracks().forEach(t => t.stop());
     return Array.from(new Uint8Array(await new Blob(chunks, { type: 'video/webm' }).arrayBuffer()));
@@ -180,7 +183,7 @@ test('compact grayscale layout and four-corner output mapping', async ({ page },
   expect(await page.evaluate(() => Number(getComputedStyle(document.documentElement).zoom))).toBe(1.4);
   await expect(page.locator('label[for=resolution]')).toContainText('RESOLUTION');
   const color = await page.locator('.channel-effects:not([hidden]) .knob').first().evaluate(el => getComputedStyle(el).borderColor);
-  const rgb = color.match(/\d+/g).map(Number); expect(rgb[0]).toBe(rgb[1]); expect(rgb[1]).toBe(rgb[2]);
+  const rgb = color.match(/\d+/g).map(Number); expect(rgb[0]).toBeGreaterThan(rgb[1]); expect(rgb[1]).toBe(rgb[2]); expect(rgb[0] - rgb[1]).toBeLessThan(60);
   const handles = page.locator('.mapping-handle'); await expect(handles.first()).toBeHidden();
   await page.locator('#mapping-toggle').check(); await expect(handles).toHaveCount(4); await expect(handles.first()).toBeVisible();
   const bounds = await page.locator('#mapping-surface').boundingBox();

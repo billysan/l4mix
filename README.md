@@ -25,6 +25,8 @@ Open **http://localhost:5173**. No installation is needed to run the mixer. The 
 - The global **RESET** restores every source and master effect, hides mapping handles, and restores all four corners. Each source’s **RESET** only resets that source’s effects (including opacity to zero); the master’s **RESET** only resets the master. Loaded clips and their transport settings are retained.
 - **Open clean output** opens a separate picture-only window. Move it to another monitor and use its fullscreen button or double-click the picture. Allow local pop-ups if the browser blocks it. Keep the mixer open while using the output window.
 
+The dashboard uses a locally bundled **BigBlueTermPlus Nerd Font Mono** font by VileR, patched by Nerd Fonts. It needs no system font installation or network access at runtime. Font attribution and licenses are in [assets/fonts/README.md](assets/fonts/README.md). Thin dark-red outlines and a faint red grid accent the grayscale controls.
+
 The mixer interface is scaled to **140%**. Set Chrome’s page zoom to **100%** to use that intended size; browser zoom compounds with the built-in scale. Output resolution and the clean output window are unaffected.
 
 ## Browser choice

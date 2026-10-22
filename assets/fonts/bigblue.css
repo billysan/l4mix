@@ -1,0 +1,8 @@
+@font-face {
+  font-family: 'MIST BigBlue';
+  src: url('/assets/fonts/BigBlueTermPlusNerdFontMono-Regular.ttf') format('truetype');
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
+:root { --font: 'MIST BigBlue', monospace; }
