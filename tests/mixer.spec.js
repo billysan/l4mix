@@ -357,7 +357,7 @@ test('Ctrl+arrows navigate channel controls and knobs without changing their val
   await move('ArrowDown'); await expect(master.getByRole('button', { name: 'Pause all sources', exact: true })).toBeFocused();
   await move('ArrowUp'); await expect(second.getByRole('button', { name: 'Eject / replace video', exact: true })).toBeFocused();
   await second.locator('[role=slider]').nth(0).focus();
-  for (let i = 0; i < 20; i++) await move('ArrowRight');
+  for (let i = 0; i < 23; i++) await move('ArrowRight');
   const last = second.locator('[role=slider]').last(); await expect(last).toBeFocused();
   expect(await last.evaluate(el => { const b = el.getBoundingClientRect(); return el.contains(document.elementFromPoint(b.x + b.width / 2, b.y + b.height / 2)); })).toBe(true);
   await expect(page.locator('.control-selected')).toHaveCount(1);
@@ -405,7 +405,7 @@ test('selected channel workspace groups effects and retains each channel state',
   await expect(page.locator('#channel-title')).toHaveCount(0);
   const panelBounds = await first.locator('.channel-effects').boundingBox(), monitorBounds = await page.locator('.monitor-section').boundingBox(), listBounds = await page.locator('.source-column-label').boundingBox();
   expect(panelBounds.y).toBeCloseTo(monitorBounds.y, 0); expect(panelBounds.y).toBeCloseTo(listBounds.y, 0);
-  await expect(first.locator('.effect-group h2')).toHaveText(['OPACITY', 'RGB', 'COLORS', 'EFFECTS', 'RGB SHIFT', 'SLIDE']);
+  await expect(first.locator('.effect-group h2')).toHaveText(['OPACITY', 'RGB', 'COLORS', 'EFFECTS', 'RGB SHIFT', 'SLIDE', 'EDGE']);
   await setValue(first, 0, 65); await setValue(first, 3, 1.2);
   await setValue(second, 0, 35); await setValue(second, 10, 30);
   await first.locator('.channel-select').click();
@@ -512,4 +512,59 @@ test('rotation turns rectangular frames clockwise without stretching or wrapping
   const masterRotation = page.locator('.master [data-parameter=rotation] .knob');
   await masterRotation.focus(); await masterRotation.press('End'); await expect(masterRotation).toHaveAttribute('aria-valuenow', '360');
   await page.locator('#reset-all').click(); await expect(masterRotation).toHaveAttribute('aria-valuenow', '0');
+});
+
+test('EDGE detects contours, controls threshold and width, blends, resets and combines with RGB shift', async ({ page }) => {
+  await page.goto('/');
+  const result = await page.evaluate(async () => {
+    const { Renderer } = await import('/src/renderer.js'), { defaults } = await import('/src/parameters.js');
+    const output = document.createElement('canvas'); output.width = output.height = 16; const r = new Renderer(output);
+    const image = document.createElement('canvas'); image.width = image.height = 16; const ctx = image.getContext('2d');
+    ctx.fillStyle = 'black'; ctx.fillRect(0,0,16,16); ctx.fillStyle = 'white'; ctx.fillRect(8,0,8,16);
+    Object.defineProperties(image, { videoWidth: { value: 16 }, videoHeight: { value: 16 }, readyState: { value: 4 } });
+    const values = { ...defaults(), opacity: 1 }, source = { id: 'step', video: image, values, dirty: true }, master = defaults(true);
+    const pixel = (x,y = 8) => { const b = new Uint8Array(4); r.gl.readPixels(x,y,1,1,r.gl.RGBA,r.gl.UNSIGNED_BYTE,b); return [...b]; };
+    r.render([source], master); const original = pixel(13);
+    values.edgeThreshold = 1; values.edgeWidth = 8; r.render([source], master); const disabled = pixel(13);
+    values.edgeAmount = 1; values.edgeThreshold = .1; values.edgeWidth = 1; r.render([source], master);
+    const edge = pixel(7), flat = pixel(13), thin = pixel(5);
+    values.edgeWidth = 3; r.render([source], master); const thick = pixel(5);
+    values.edgeThreshold = 1; r.render([source], master); const suppressed = pixel(7);
+    values.edgeThreshold = .1; values.edgeAmount = .5; r.render([source], master); const blended = pixel(11);
+    values.edgeAmount = 1; values.edgeWidth = 1; values.redX = .125; r.render([source], master); const combined = pixel(7);
+    values.edgeAmount = 0; values.redX = 0; r.render([source], { ...master, edgeAmount: 1 }); const masterEdge = pixel(7), masterFlat = pixel(13);
+    const neutral = r.isNeutral({ ...master, edgeThreshold: 1, edgeWidth: 8 }), nonNeutral = r.isNeutral({ ...master, edgeAmount: .1 });
+    const glError = r.gl.getError(); r.dispose(); return { original, disabled, edge, flat, thin, thick, suppressed, blended, combined, masterEdge, masterFlat, neutral, nonNeutral, glError };
+  });
+  const white = [255,255,255,255], black = [0,0,0,255];
+  for (const key of ['original', 'disabled', 'edge', 'thick', 'combined', 'masterEdge']) expect(result[key]).toEqual(white);
+  for (const key of ['flat', 'thin', 'suppressed', 'masterFlat']) expect(result[key]).toEqual(black);
+  expect(result.blended[0]).toBeGreaterThanOrEqual(127); expect(result.blended[0]).toBeLessThanOrEqual(128);
+  expect(result.neutral).toBe(true); expect(result.nonNeutral).toBe(false); expect(result.glError).toBe(0);
+  await page.locator('#file-input').setInputFiles(await clip(page));
+  const row = page.locator('.source-row'), amount = row.locator('[data-parameter=edgeAmount] .knob');
+  await expect(amount).toHaveAttribute('aria-valuenow', '0');
+  const input = row.locator('[data-parameter=edgeAmount] input'); await input.fill('100'); await input.press('Enter');
+  await row.getByRole('button', { name: 'Reset source effects', exact: true }).click(); await expect(amount).toHaveAttribute('aria-valuenow', '0');
+  await page.locator('.master .channel-select').click();
+  const masterInput = page.locator('.master [data-parameter=edgeAmount] input'); await masterInput.fill('100'); await masterInput.press('Enter');
+  await page.locator('#reset-all').click(); await expect(page.locator('.master [data-parameter=edgeAmount] .knob')).toHaveAttribute('aria-valuenow', '0');
+});
+
+test('EDGE software performance with two videos, including RGB shift', async ({ page }, testInfo) => {
+  await page.goto('/'); const fixture = await clip(page, 640, 360);
+  await page.locator('#file-input').setInputFiles([fixture, { ...fixture, name: 'second.webm' }]);
+  const first = page.locator('.source-row').first(), second = page.locator('.source-row').nth(1);
+  await expect(first.locator('small')).toContainText('PLAYING'); await setValue(first, 0, 70); await setValue(second, 0, 40);
+  async function value(key, text) {
+    await first.locator('.channel-select').click(); const input = first.locator(`[data-parameter=${key}] input`); await input.fill(text); await input.press('Enter');
+  }
+  const fps = async () => { await page.waitForTimeout(1200); const readings = []; for (let i = 0; i < 2; i++) { await page.waitForTimeout(1100); readings.push(Number(await page.locator('#fps').textContent())); } return readings; };
+  const baseline = await fps(); await value('edgeAmount', '100'); const edge = await fps();
+  await value('redX', '2'); await value('blueY', '-2'); const combined = await fps();
+  await page.locator('#resolution').selectOption('360'); const combined360 = await fps();
+  const report = { baseline720: baseline, edge720: edge, edgeAndRGBShift720: combined, edgeAndRGBShift360: combined360, note: 'Two 640x360 VP8 clips; EDGE and RGB SHIFT on first source, software Chromium; short headless samples.' };
+  console.log('EDGE performance:', JSON.stringify(report)); await testInfo.attach('edge-performance', { body: JSON.stringify(report, null, 2), contentType: 'application/json' });
+  expect([...baseline, ...edge, ...combined, ...combined360].every(Number.isFinite)).toBe(true); expect(edge.some(f => f > 0)).toBe(true);
+  await page.screenshot({ path: testInfo.outputPath('edge-workspace.png'), fullPage: true });
 });

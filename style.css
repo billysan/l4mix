@@ -176,3 +176,6 @@ main { grid-template-columns: minmax(0, 4fr) minmax(175px, 1fr); gap: 16px; padd
 .system-stats > div { display: flex; justify-content: space-between; gap: 8px; }
 .system-stats dt, .system-stats dd { margin: 0; }
 .system-stats dd { color: var(--text); }
+
+.group-edge { grid-column: 1 / -1; }
+.group-edge .effect-knobs { grid-template-columns: repeat(3, minmax(0, 1fr)); }

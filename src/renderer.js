@@ -17,6 +17,8 @@ uniform mat3 colorMatrix;
 uniform vec3 colorOffset;
 uniform vec2 slide, redShift, greenShift, blueShift, rotationCS;
 uniform bool splitChannels;
+uniform bool edgeEnabled;
+uniform float edgeAmount, edgeThreshold, edgeWidth;
 uniform bool master;
 uniform bool mappingEnabled;
 uniform mat3 mappingMatrix;
@@ -41,6 +43,21 @@ vec4 readImage(vec2 p) {
   }
   return texture(image, p);
 }
+vec4 readChannels(vec2 p) {
+  vec4 sampleColor;
+  if (splitChannels) {
+    vec4 r = readImage(p - vec2(redShift.x, -redShift.y));
+    vec4 g = readImage(p - vec2(greenShift.x, -greenShift.y));
+    vec4 b = readImage(p - vec2(blueShift.x, -blueShift.y));
+    sampleColor = vec4(r.r, g.g, b.b, max(r.a, max(g.a, b.a)));
+  } else sampleColor = readImage(p);
+  return sampleColor;
+}
+float luminanceAt(vec2 p) {
+  vec4 sampleColor = readChannels(p);
+  vec3 c = clamp(colorMatrix * sampleColor.rgb + colorOffset, 0., 1.) * sampleColor.a;
+  return dot(c, vec3(.2126, .7152, .0722));
+}
 void main() {
   vec2 p = uv;
   if (master && mappingEnabled) {
@@ -51,15 +68,18 @@ void main() {
     p = vec2(original.x, 1. - original.y);
   }
   p -= vec2(slide.x, -slide.y);
-  vec4 sampleColor;
-  if (splitChannels) {
-    vec4 r = readImage(p - vec2(redShift.x, -redShift.y));
-    vec4 g = readImage(p - vec2(greenShift.x, -greenShift.y));
-    vec4 b = readImage(p - vec2(blueShift.x, -blueShift.y));
-    sampleColor = vec4(r.r, g.g, b.b, max(r.a, max(g.a, b.a)));
-  } else sampleColor = readImage(p);
+  vec4 sampleColor = readChannels(p);
   if (sampleColor.a == 0.) { color = master ? vec4(0., 0., 0., 1.) : vec4(0.); return; }
   vec3 c = colorMatrix * sampleColor.rgb + colorOffset;
+  if (edgeEnabled) {
+    vec2 offset = vec2(edgeWidth) / outputSize;
+    float center = dot(clamp(c, 0., 1.) * sampleColor.a, vec3(.2126, .7152, .0722));
+    float dx = luminanceAt(p + vec2(offset.x, 0.)) - center;
+    float dy = luminanceAt(p + vec2(0., offset.y)) - center;
+    float gradient = min(length(vec2(dx, dy)), 1.);
+    float edge = smoothstep(edgeThreshold, edgeThreshold + .05, gradient);
+    c = mix(clamp(c, 0., 1.), vec3(edge), edgeAmount);
+  }
   float alpha = master ? opacity : opacity * sampleColor.a;
   color = vec4(clamp(c, 0., 1.) * alpha, master ? 1. : alpha);
 }
@@ -85,16 +105,16 @@ export class Renderer {
       if (!gl.getShaderParameter(shader, gl.COMPILE_STATUS)) { const log = gl.getShaderInfoLog(shader); gl.deleteShader(shader); throw new Error(`Video shader failed: ${log}`); }
       return shader;
     };
-    const keys = ['image', 'sourceSize', 'outputSize', 'master', 'opacity', 'mirrorX', 'mirrorY', 'pixelation', 'colorMatrix', 'colorOffset', 'mappingEnabled', 'mappingMatrix', 'slide', 'redShift', 'greenShift', 'blueShift', 'rotationCS'];
-    this.variants = [false, true].map(split => {
+    const keys = ['image', 'sourceSize', 'outputSize', 'master', 'opacity', 'mirrorX', 'mirrorY', 'pixelation', 'colorMatrix', 'colorOffset', 'mappingEnabled', 'mappingMatrix', 'slide', 'redShift', 'greenShift', 'blueShift', 'rotationCS', 'edgeAmount', 'edgeThreshold', 'edgeWidth'];
+    this.variants = [false, true].flatMap(edge => [false, true].map(split => {
       const vs = compile(gl.VERTEX_SHADER, vertex);
-      // Specialize the zero-shift path so software GL does not pay for three samples.
-      const fs = compile(gl.FRAGMENT_SHADER, fragment.replace('uniform bool splitChannels;', `const bool splitChannels = ${split};`));
+      // Compile away disabled effects, including all neighbor reads when EDGE is at zero.
+      const fs = compile(gl.FRAGMENT_SHADER, fragment.replace('uniform bool splitChannels;', `const bool splitChannels = ${split};`).replace('uniform bool edgeEnabled;', `const bool edgeEnabled = ${edge};`));
       const program = gl.createProgram(); gl.attachShader(program, vs); gl.attachShader(program, fs); gl.linkProgram(program);
       gl.deleteShader(vs); gl.deleteShader(fs);
       if (!gl.getProgramParameter(program, gl.LINK_STATUS)) throw new Error('Could not initialize the video effects program.');
       return { program, uniforms: Object.fromEntries(keys.map(key => [key, gl.getUniformLocation(program, key)])) };
-    });
+    }));
     this.program = this.variants[0].program; this.uniforms = this.variants[0].uniforms;
     this.vao = gl.createVertexArray(); gl.bindVertexArray(this.vao);
     this.buffer = gl.createBuffer(); gl.bindBuffer(gl.ARRAY_BUFFER, this.buffer);
@@ -124,7 +144,7 @@ export class Renderer {
   draw(texture, size, values, master = false) {
     const gl = this.gl;
     const split = ['redX', 'redY', 'greenX', 'greenY', 'blueX', 'blueY'].some(key => values[key]);
-    const variant = this.variants[split ? 1 : 0]; this.program = variant.program; this.uniforms = variant.uniforms;
+    const variant = this.variants[(values.edgeAmount > 0 ? 2 : 0) + (split ? 1 : 0)]; this.program = variant.program; this.uniforms = variant.uniforms;
     gl.useProgram(this.program); gl.uniform1i(this.uniforms.image, 0);
     gl.uniform2f(this.uniforms.outputSize, this.canvas.width, this.canvas.height);
     gl.uniform1i(this.uniforms.mappingEnabled, this.frameMapping ? 1 : 0);
@@ -164,7 +184,7 @@ export class Renderer {
     const result = { signature, matrix, offset }; this.colorCache.set(v, result); return result;
   }
   isNeutral(v) {
-    return v.opacity === 1 && v.inversion === 0 && v.brightness === 0 && v.contrast === 1 && v.saturation === 1 && v.red === 1 && v.green === 1 && v.blue === 1 && v.mirrorX === 1 && v.mirrorY === 1 && v.hue === 0 && v.pixelation === 1 && !(v.rotation % 360) && ['slideX', 'slideY', 'redX', 'redY', 'greenX', 'greenY', 'blueX', 'blueY'].every(key => !v[key]);
+    return v.opacity === 1 && !v.edgeAmount && v.inversion === 0 && v.brightness === 0 && v.contrast === 1 && v.saturation === 1 && v.red === 1 && v.green === 1 && v.blue === 1 && v.mirrorX === 1 && v.mirrorY === 1 && v.hue === 0 && v.pixelation === 1 && !(v.rotation % 360) && ['slideX', 'slideY', 'redX', 'redY', 'greenX', 'greenY', 'blueX', 'blueY'].every(key => !v[key]);
   }
   render(sources, master, mapping = null) {
     if (this.lost) return false;

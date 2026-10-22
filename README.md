@@ -16,7 +16,7 @@ Open **http://localhost:5173**. No installation is needed to run the mixer. The 
 
 - Drop up to **two video files** onto the window, or click the **+** beside **SOURCE**. Browser codec support determines which files play; MP4 and WebM are good starting points.
 - Each source starts at **0% opacity**. Raise opacity to bring it into the mix. The master starts at 100%. Sources use screen blending: at 100%, each source combines with the others instead of hiding them. Black contributes nothing; opacity controls the strength of each source.
-- Select a source or **MASTER** in the left list to show its controls in the central grid. Each channel retains its own settings. **OPACITY** is separate, **RGB** groups the three gains, **COLORS** contains brightness, contrast, saturation and hue, **EFFECTS** holds invert, cloning and pixelation, **RGB SHIFT** separates the color planes, and **SLIDE** moves the whole picture. The selected channel is highlighted in the source list.
+- Select a source or **MASTER** in the left list to show its controls in the central grid. Each channel retains its own settings. **OPACITY** is separate, **RGB** groups the three gains, **COLORS** contains brightness, contrast, saturation and hue, **EFFECTS** holds invert, cloning and pixelation, **RGB SHIFT** separates the color planes, **SLIDE** moves and rotates the whole picture, and **EDGE** extracts contours. The selected channel is highlighted in the source list.
 - **Ctrl+Left/Right** moves between source controls and knobs. **Ctrl+Up/Down** moves between source rows and MASTER, keeping the same parameter or closest available control. Click a control or press Ctrl+an arrow from the page to start; the selected control has a bright outline and scrolls into view. Plain arrows adjust knobs, and text fields retain normal Ctrl+arrow text navigation.
 - Drag a knob up/down; hold Shift for finer movement. Use arrow keys, Page Up/Down, or Home/End with a focused knob. Double-click to reset. Click a displayed value to type a number; Enter commits and Escape cancels. Percentages are entered as 0–100.
 - Pause playback with the controls beside each source. The eject icon opens the replacement file picker; cancelling keeps the current clip. Clicking the filename selects its channel; use eject to replace its clip. Replacements retain that row’s effects and preview preference. The × button removes a source. Screen blending is independent of source order. Videos are muted.
@@ -46,12 +46,16 @@ Every channel has the same fixed chain; the workspace grouping is for navigation
 | Hue | −180° to +180° | 0° |
 | Pixelate | 1–128 source pixels per block | 1 px (off) |
 | R / G / B X and Y | −100 to +100% of the output width / height | 0% |
+| Edge amount / threshold | 0–100% | Amount 0% (off), threshold 10% |
+| Edge width | 1–8 output pixels | 1 px |
 | Rotate (in SLIDE) | 0–360°, clockwise around the picture center | 0° |
 | Slide X and Y | −100 to +100% of the output width / height | 0% |
 
 RGB shifts, slide and rotation leave empty edges without wrapping. Rotation preserves proportions at rectangular output resolutions, then slide moves the rotated picture. Empty source areas reveal the mix underneath; empty master areas are black. The eight shift controls and rotation start at zero and participate in channel and global resets. Neutral RGB shift uses one texture sample; enabled RGB separation uses three in the same shader pass.
 
 Clips retain their aspect ratio and fit within the canvas. Empty areas are transparent while layering, with black behind the finished mix. Master effects also affect that black background.
+
+EDGE compares luminance at the center and two neighboring positions after spatial and color effects, in the existing shader pass. AMOUNT blends between the original image (0%) and bright contours on black (100%); THRESHOLD suppresses weaker differences, and WIDTH changes the neighbor spacing in output pixels before mapping. Source opacity and screen blending still apply. All three controls work on sources and MASTER and participate in resets. The disabled shader variant omits neighbor reads entirely, even if threshold or width has been changed. Enabled EDGE uses three image samples, or nine when combined with RGB SHIFT on the same channel; lower the output resolution if that combination is slow on software WebGL. A short headless Chromium/SwiftShader check with two 640×360 VP8 clips measured 28 fps without EDGE, 17–22 fps with EDGE on the first source at 720p, 11 fps with EDGE plus RGB SHIFT, and 29–30 fps for that combination at 360p. These are local samples, not a guaranteed frame rate.
 
 ## Output mapping
 

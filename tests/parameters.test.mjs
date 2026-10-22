@@ -8,6 +8,8 @@ test('both source slots start invisible, while master passes the mix through', (
   assert.equal(defaults(true).opacity, 1);
   assert.equal(defaults().mirrorX, 1);
   assert.equal(defaults().pixelation, 1);
+  assert.equal(defaults().edgeAmount, 0); assert.equal(defaults(true).edgeAmount, 0);
+  assert.equal(defaults().edgeWidth, 1); assert.equal(defaults().edgeThreshold, .1);
   for (const key of ['redX', 'redY', 'greenX', 'greenY', 'blueX', 'blueY', 'slideX', 'slideY']) {
     assert.equal(defaults()[key], 0); assert.equal(defaults(true)[key], 0);
   }
