@@ -12,6 +12,10 @@ export const PARAMETERS = [
   { key: 'mirrorY', label: 'CLONE Y', min: 1, max: 16, step: 1, initial: 1, unit: '×' },
   { key: 'hue', label: 'HUE', min: -180, max: 180, step: 1, initial: 0, unit: '°', signed: true },
   { key: 'pixelation', label: 'PIXELATE', min: 1, max: 128, step: 1, initial: 1, unit: 'px' },
+  ...['redX', 'redY', 'greenX', 'greenY', 'blueX', 'blueY', 'slideX', 'slideY'].map(key => ({
+    key, label: ({redX: 'R X', redY: 'R Y', greenX: 'G X', greenY: 'G Y', blueX: 'B X', blueY: 'B Y', slideX: 'X', slideY: 'Y'})[key],
+    min: -1, max: 1, step: .001, initial: 0, unit: '%', scale: 100, signed: true,
+  })),
 ];
 export function defaults(master = false) {
   return Object.fromEntries(PARAMETERS.map(p => [p.key, master ? (p.master ?? p.initial) : p.initial]));
@@ -22,6 +26,6 @@ export function clampParameter(p, value) {
 }
 export function formatParameter(p, value) {
   const scaled = value * (p.scale || 1);
-  const digits = p.step < 1 && !p.scale ? 2 : 0;
+  const digits = Math.max(0, Math.ceil(-Math.log10(p.step * (p.scale || 1))));
   return `${p.signed && scaled > 0 ? '+' : ''}${scaled.toFixed(digits)}${p.unit || ''}`;
 }

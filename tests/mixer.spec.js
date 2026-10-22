@@ -357,7 +357,7 @@ test('Ctrl+arrows navigate channel controls and knobs without changing their val
   await move('ArrowDown'); await expect(master.getByRole('button', { name: 'Pause all sources', exact: true })).toBeFocused();
   await move('ArrowUp'); await expect(second.getByRole('button', { name: 'Eject / replace video', exact: true })).toBeFocused();
   await second.locator('[role=slider]').nth(0).focus();
-  for (let i = 0; i < 11; i++) await move('ArrowRight');
+  for (let i = 0; i < 19; i++) await move('ArrowRight');
   const last = second.locator('[role=slider]').last(); await expect(last).toBeFocused();
   expect(await last.evaluate(el => { const b = el.getBoundingClientRect(); return el.contains(document.elementFromPoint(b.x + b.width / 2, b.y + b.height / 2)); })).toBe(true);
   await expect(page.locator('.control-selected')).toHaveCount(1);
@@ -405,7 +405,7 @@ test('selected channel workspace groups effects and retains each channel state',
   await expect(page.locator('#channel-title')).toHaveCount(0);
   const panelBounds = await first.locator('.channel-effects').boundingBox(), monitorBounds = await page.locator('.monitor-section').boundingBox(), listBounds = await page.locator('.source-column-label').boundingBox();
   expect(panelBounds.y).toBeCloseTo(monitorBounds.y, 0); expect(panelBounds.y).toBeCloseTo(listBounds.y, 0);
-  await expect(first.locator('.effect-group h2')).toHaveText(['OPACITY', 'RGB', 'COLORS', 'EFFECTS']);
+  await expect(first.locator('.effect-group h2')).toHaveText(['OPACITY', 'RGB', 'COLORS', 'EFFECTS', 'RGB SHIFT', 'SLIDE']);
   await setValue(first, 0, 65); await setValue(first, 3, 1.2);
   await setValue(second, 0, 35); await setValue(second, 10, 30);
   await first.locator('.channel-select').click();
@@ -424,4 +424,58 @@ test('selected channel workspace groups effects and retains each channel state',
   await page.screenshot({ path: testInfo.outputPath('channel-workspace.png'), fullPage: true });
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
   expect(errors).toEqual([]);
+});
+
+test('RGB shifts separate each component on both axes; slide leaves empty edges in sources and master', async ({ page }) => {
+  await page.goto('/');
+  const results = await page.evaluate(async () => {
+    const { Renderer } = await import('/src/renderer.js'), { defaults } = await import('/src/parameters.js');
+    const output = document.createElement('canvas'); output.width = output.height = 8;
+    const r = new Renderer(output);
+    const source = (id, color) => {
+      const c = document.createElement('canvas'); c.width = c.height = 8; const ctx = c.getContext('2d'); ctx.fillStyle = color; ctx.fillRect(0, 0, 8, 8);
+      Object.defineProperties(c, { videoWidth: { value: 8 }, videoHeight: { value: 8 }, readyState: { value: 4 } });
+      return { id, video: c, values: { ...defaults(), opacity: 1 }, dirty: true };
+    };
+    const white = source('white', 'white'), red = source('red', 'red'), blue = source('blue', 'blue'), master = defaults(true);
+    const pixel = (x, y) => { const data = new Uint8Array(4); r.gl.readPixels(x, 7 - y, 1, 1, r.gl.RGBA, r.gl.UNSIGNED_BYTE, data); return [...data]; };
+    const shifts = {};
+    for (const key of ['redX', 'redY', 'greenX', 'greenY', 'blueX', 'blueY']) {
+      for (const sign of [-1, 1]) {
+        white.values[key] = sign * .5; r.render([white], master);
+        const x = key.endsWith('X') ? sign > 0 ? 1 : 6 : 3, y = key.endsWith('Y') ? sign > 0 ? 1 : 6 : 3;
+        shifts[key + sign] = pixel(x, y); white.values[key] = 0;
+      }
+    }
+    const slides = {};
+    for (const key of ['slideX', 'slideY']) {
+      for (const sign of [-1, 1]) {
+        white.values[key] = sign * .5; r.render([white], master);
+        const x = key.endsWith('X') ? sign > 0 ? 1 : 6 : 3, y = key.endsWith('Y') ? sign > 0 ? 1 : 6 : 3;
+        slides[key + sign] = { empty: pixel(x, y), filled: pixel(7 - x, 7 - y) }; white.values[key] = 0;
+      }
+    }
+    blue.values.slideX = .5; r.render([red, blue], master); const underlying = pixel(1, 3), overlay = pixel(6, 3);
+    r.render([white], { ...master, slideX: .5, inversion: 1 }); const masterEmpty = pixel(1, 3), masterInvert = pixel(6, 3);
+    r.render([white], { ...master, redY: .5 }); const masterShift = pixel(3, 1);
+    const neutral = r.isNeutral(master), shiftedNeutral = r.isNeutral({ ...master, redX: .1 });
+    const error = r.gl.getError(); r.dispose(); return { shifts, slides, underlying, overlay, masterEmpty, masterInvert, masterShift, neutral, shiftedNeutral, error };
+  });
+  for (const [key, pixel] of Object.entries(results.shifts)) {
+    const expected = key.startsWith('red') ? [0,255,255,255] : key.startsWith('green') ? [255,0,255,255] : [255,255,0,255];
+    expect(pixel).toEqual(expected);
+  }
+  for (const result of Object.values(results.slides)) { expect(result.empty).toEqual([0,0,0,255]); expect(result.filled).toEqual([255,255,255,255]); }
+  expect(results.underlying).toEqual([255,0,0,255]); expect(results.overlay).toEqual([255,0,255,255]);
+  expect(results.masterEmpty).toEqual([0,0,0,255]); expect(results.masterInvert).toEqual([0,0,0,255]); expect(results.masterShift).toEqual([0,255,255,255]);
+  expect(results.neutral).toBe(true); expect(results.shiftedNeutral).toBe(false); expect(results.error).toBe(0);
+});
+
+test('telemetry displays system readings and handles unavailable counters', async ({ page }) => {
+  await page.route('**/api/telemetry', route => route.fulfill({ json: { cpu: 27.3, gpu: null, memoryUsed: 2 ** 31, memoryTotal: 2 ** 33 } }));
+  await page.goto('/');
+  await expect(page.locator('#cpu-load')).toHaveText('27%'); await expect(page.locator('#gpu-load')).toHaveText('—');
+  await expect(page.locator('#memory-use')).toHaveText('2.0 / 8.0 GiB');
+  await page.route('**/api/telemetry', route => route.fulfill({ status: 503, body: 'Unavailable' }));
+  await expect(page.locator('#cpu-load')).toHaveText('—'); await expect(page.locator('#memory-use')).toHaveText('—');
 });

@@ -40,6 +40,12 @@
         </div>
         <div class="signal-controls"><span class="signal-label" id="signal-label" role="status">X SIGNAL</span><button id="reset-all" class="reset-button" title="Reset all source and master effects and output mapping">RESET</button></div>
         <div class="performance"><span class="live-dot" id="performance-dot"></span><span id="fps">0</span><span>FPS</span><span class="performance-separator">/</span><span id="dropped">0</span><span>DECODE DROPS</span></div>
+        <dl class="system-stats" aria-label="System performance">
+          <div><dt>CPU</dt><dd id="cpu-load" title="System-wide CPU utilization">—</dd></div>
+          <div><dt>GPU</dt><dd id="gpu-load" title="Busiest supported GPU; unavailable drivers show a dash">—</dd></div>
+          <div><dt>RAM</dt><dd id="memory-use" title="System-wide used / total RAM, excluding available cache on Linux">—</dd></div>
+          <div><dt>RENDER CPU</dt><dd id="render-time" title="Average CPU time submitting each rendered frame; excludes asynchronous GPU execution">—</dd></div>
+        </dl>
       </div>
     </aside>
     <div id="messages" class="messages" aria-live="polite"></div>

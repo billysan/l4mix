@@ -13,6 +13,7 @@ let renderer, nextId = 1, replacementId = null, outputWindow = null, outputStrea
 let renderDirty = true, lastRender = -Infinity, lastStats = performance.now(), frames = 0, disposed = false;
 const canvas = $('#output');
 let selectedOwner = master;
+let renderTime = 0;
 
 function message(text, persistent = false) {
   const item = document.createElement('div'); item.className = 'message';
@@ -91,12 +92,14 @@ const EFFECT_GROUPS = [
   ['RGB', ['red', 'green', 'blue']],
   ['COLORS', ['brightness', 'contrast', 'saturation', 'hue']],
   ['EFFECTS', ['inversion', 'mirrorX', 'mirrorY', 'pixelation']],
+  ['RGB SHIFT', ['redX', 'redY', 'greenX', 'greenY', 'blueX', 'blueY']],
+  ['SLIDE', ['slideX', 'slideY']],
 ];
 function effectPanel(owner) {
   const panel = document.createElement('div'); panel.className = 'channel-effects'; owner.panel = panel;
   panel.setAttribute('aria-label', owner.id === 'master' ? 'Master effects' : `Source ${owner.number} effects`);
   for (const [name, keys] of EFFECT_GROUPS) {
-    const group = document.createElement('section'); group.className = `effect-group group-${name.toLowerCase()}`;
+    const group = document.createElement('section'); group.className = `effect-group group-${name.toLowerCase().replaceAll(' ', '-')}`;
     const heading = document.createElement('h2'); heading.textContent = name; group.append(heading);
     const grid = document.createElement('div'); grid.className = 'effect-knobs';
     for (const key of keys) grid.append(knob(PARAMETERS.find(p => p.key === key), owner));
@@ -330,7 +333,9 @@ function renderFrame(now, fromOutput = false) {
   if (document.hidden && !fromOutput) return;
   if (renderer && (master.preview || (outputWindow && !outputWindow.closed)) && (renderDirty || playing || sources.some(s => s.dirty && s.values.opacity > 0))) {
     try {
+      const started = performance.now();
       if (renderer.render(sources, master.values, mapping)) {
+        renderTime += performance.now() - started;
         renderDirty = false; frames++;
         // Explicit capture also works when the mixer canvas is covered by fullscreen output.
         if (outputStream) { renderer.gl.flush(); outputStream.getVideoTracks()[0]?.requestFrame?.(); }
@@ -343,9 +348,23 @@ function renderFrame(now, fromOutput = false) {
     const fps = frames * 1000 / (now - lastStats); $('#fps').textContent = Math.round(fps);
     $('#performance-dot').classList.toggle('slow', playing && fps < 24);
     $('#dropped').textContent = sources.reduce((sum, s) => sum + (s.video.getVideoPlaybackQuality?.().droppedVideoFrames || 0), 0);
-    lastStats = now; frames = 0;
+    $('#render-time').textContent = frames ? `${(renderTime / frames).toFixed(1)} ms` : '—';
+    lastStats = now; frames = 0; renderTime = 0;
   }
 }
+async function updateSystemStats() {
+  if (disposed) return;
+  try {
+    const response = await fetch('/api/telemetry');
+    if (!response.ok) throw new Error('Unavailable');
+    const stats = await response.json();
+    const percent = value => typeof value === 'number' && Number.isFinite(value) ? `${Math.round(value)}%` : '—';
+    $('#cpu-load').textContent = percent(stats.cpu); $('#gpu-load').textContent = percent(stats.gpu);
+    $('#memory-use').textContent = Number.isFinite(stats.memoryUsed) && stats.memoryTotal > 0 ? `${(stats.memoryUsed / 2 ** 30).toFixed(1)} / ${(stats.memoryTotal / 2 ** 30).toFixed(1)} GiB` : '—';
+  } catch { for (const id of ['cpu-load', 'gpu-load', 'memory-use']) $(`#${id}`).textContent = '—'; }
+  if (!disposed) setTimeout(updateSystemStats, 1500);
+}
+updateSystemStats();
 function tick(now) {
   if (disposed) return;
   requestAnimationFrame(tick); renderFrame(now);

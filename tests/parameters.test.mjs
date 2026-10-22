@@ -8,6 +8,9 @@ test('both source slots start invisible, while master passes the mix through', (
   assert.equal(defaults(true).opacity, 1);
   assert.equal(defaults().mirrorX, 1);
   assert.equal(defaults().pixelation, 1);
+  for (const key of ['redX', 'redY', 'greenX', 'greenY', 'blueX', 'blueY', 'slideX', 'slideY']) {
+    assert.equal(defaults()[key], 0); assert.equal(defaults(true)[key], 0);
+  }
 });
 test('numeric input clamps and quantizes without NaN or fractional mirror counts', () => {
   const mirror = PARAMETERS.find(p => p.key === 'mirrorX');
@@ -18,4 +21,5 @@ test('numeric input clamps and quantizes without NaN or fractional mirror counts
   assert.equal(clampParameter(opacity, .567), .57);
   assert.equal(clampParameter(opacity, NaN), 0);
   assert.equal(formatParameter(opacity, .5), '50%');
+  assert.equal(formatParameter(PARAMETERS.find(p => p.key === 'slideX'), .001), '+0.1%');
 });

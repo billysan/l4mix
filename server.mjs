@@ -1,4 +1,5 @@
 import http from 'node:http';
+import { systemTelemetry } from './server/telemetry.mjs';
 import { readFile } from 'node:fs/promises';
 import { fileURLToPath } from 'node:url';
 import path from 'node:path';
@@ -9,6 +10,10 @@ const port = Number(process.env.PORT || 5173);
 http.createServer(async (req, res) => {
   try {
     const pathname = decodeURIComponent(new URL(req.url, 'http://localhost').pathname);
+    if (pathname === '/api/telemetry') {
+      res.writeHead(200, { 'Content-Type': 'application/json', 'Cache-Control': 'no-store' });
+      res.end(JSON.stringify(await systemTelemetry())); return;
+    }
     const file = path.resolve(root, `.${pathname === '/' ? '/index.html' : pathname}`);
     if (!file.startsWith(root + path.sep) || (!['index.html', 'output.html', 'style.css', 'favicon.svg'].includes(path.relative(root, file)) && !file.startsWith(path.join(root, 'src') + path.sep))) {
       res.writeHead(404).end('Not found'); return;
