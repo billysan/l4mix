@@ -1,8 +1,9 @@
 <!doctype html>
-<html lang="en">
+<html lang="en" data-theme="classic">
 <head>
   <meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
   <meta name="theme-color" content="#141414"><meta name="description" content="A local multi-source video mixer.">
+  <script src="/src/theme.js"></script>
   <title>MIST — video mixer</title>
   <link rel="preload" href="/assets/fonts/BigBlueTermPlusNerdFontMono-Regular.ttf" as="font" type="font/ttf" crossorigin>
   <link rel="stylesheet" href="/assets/fonts/bigblue.css">
@@ -35,6 +36,7 @@
         </div>
       </div>
       <div class="output-panel">
+        <div class="theme-settings"><label for="theme">THEME <select id="theme"><option value="classic">CLASSIC</option><option value="dark">DARK</option><option value="sunset">SUNSET</option><option value="tropicana">TROPICANA</option></select></label></div>
         <div class="mapping-settings"><label><input id="mapping-toggle" type="checkbox" title="Show or hide mapping handles; the warp stays applied"> MAPPING</label><button id="reset-mapping" class="reset-button" aria-label="Reset mapping" title="Restore all four mapping corners">RESET</button></div>
         <div class="output-settings">
           <label for="resolution">RESOLUTION <select id="resolution"><option value="360">640 × 360</option><option value="540">960 × 540</option><option value="720">1280 × 720</option><option value="1080" selected>1920 × 1080</option></select></label>

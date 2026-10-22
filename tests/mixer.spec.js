@@ -620,3 +620,41 @@ test('1080p is the default and six sources stay selectable, replaceable and alig
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
   await expect(page.locator('#empty-add')).toBeEnabled(); expect(errors).toEqual([]);
 });
+
+test('themes change dashboard colors, preserve the mix, persist and recover from unknown saved values', async ({ page }, testInfo) => {
+  const errors = []; page.on('pageerror', e => errors.push(e.message));
+  await page.goto('/'); await expect(page.locator('#theme')).toHaveValue('classic');
+  await expect(page.locator('#theme option')).toHaveText(['CLASSIC', 'DARK', 'SUNSET', 'TROPICANA']);
+  await page.locator('#file-input').setInputFiles(await clip(page));
+  const row = page.locator('.source-row'); await expect(row.locator('small')).toContainText('PLAYING');
+  await setValue(row, 0, 65); await setValue(row, 3, 1.5);
+  await row.getByRole('button', { name: 'Pause video', exact: true }).click();
+  const before = await row.locator('.knob').evaluateAll(controls => controls.map(el => el.getAttribute('aria-valuenow')));
+  const originalVideo = await row.locator('video').evaluate(video => ({ src: video.src, time: video.currentTime }));
+  const palettes = [];
+  for (const theme of ['classic', 'dark', 'sunset', 'tropicana']) {
+    await page.locator('#theme').selectOption(theme);
+    await expect(page.locator('html')).toHaveAttribute('data-theme', theme);
+    palettes.push(await page.locator('.effect-group').first().evaluate(el => getComputedStyle(el).backgroundColor));
+    expect(await row.locator('.knob').evaluateAll(controls => controls.map(el => el.getAttribute('aria-valuenow')))).toEqual(before);
+    expect(await row.locator('video').evaluate(v => ({ src: v.src, time: v.currentTime, paused: v.paused }))).toEqual({ ...originalVideo, paused: true });
+    expect(await page.locator('#output').evaluate(c => [c.width,c.height])).toEqual([1920,1080]);
+    await page.screenshot({ path: testInfo.outputPath(`theme-${theme}.png`), fullPage: true });
+  }
+  expect(new Set(palettes).size).toBe(4);
+  await page.reload(); await expect(page.locator('#theme')).toHaveValue('tropicana');
+  await expect(page.locator('html')).toHaveAttribute('data-theme', 'tropicana');
+  const second = await page.context().newPage(); await second.goto('/'); await expect(second.locator('#theme')).toHaveValue('tropicana');
+  await page.locator('#theme').selectOption('sunset'); await expect(second.locator('#theme')).toHaveValue('sunset'); await second.close();
+  await page.evaluate(() => localStorage.setItem('mist-theme', 'unknown-palette')); await page.reload();
+  await expect(page.locator('#theme')).toHaveValue('classic'); await expect(page.locator('html')).toHaveAttribute('data-theme', 'classic');
+  expect(errors).toEqual([]);
+});
+
+test('theme selection works when local storage is blocked', async ({ page }) => {
+  const errors = []; page.on('pageerror', e => errors.push(e.message));
+  await page.addInitScript(() => Object.defineProperty(window, 'localStorage', { get() { throw new DOMException('Blocked', 'SecurityError'); } }));
+  await page.goto('/'); await expect(page.locator('#theme')).toHaveValue('classic');
+  await page.locator('#theme').selectOption('sunset'); await expect(page.locator('html')).toHaveAttribute('data-theme', 'sunset');
+  await page.reload(); await expect(page.locator('#theme')).toHaveValue('classic'); expect(errors).toEqual([]);
+});

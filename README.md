@@ -33,6 +33,12 @@ The mixer interface is scaled to **140%**. Set Chrome’s page zoom to **100%** 
 
 **Chromium is the recommended browser for this build.** In a local headless spot check using two 360p H.264 sample clips, 720p output, source previews off, cloning and hue effects, Chromium 150 with SwiftShader reached 30 fps and Firefox 152 reached about 20 fps. This compares those specific configurations; desktop performance can differ. Firefox successfully loaded and mixed the same clips.
 
+## Themes
+
+Choose **THEME** below the monitor: **CLASSIC** keeps the original gray dashboard and subtle red table grid; **DARK** uses near-black slate; **SUNSET** uses plum and warm peach; **TROPICANA** uses deep teal, green and sand accents. All keep the BigBlueTerm font and centered headings.
+
+The selection is saved locally and restored before the first paint, and open mixer tabs stay in sync. If browser storage is blocked, themes still work for the session. Unknown saved values fall back to CLASSIC. Themes affect interface colors only; video output, loaded clips, effects, mapping, resolution and transport are unchanged. RESET retains the chosen theme.
+
 ## Controls
 
 Every channel has the same fixed chain; the workspace grouping is for navigation and does not change processing order. Slide and independent RGB shifts use output-frame coordinates, with positive X moving right and positive Y moving down. Each sample then applies aspect fit, cloning and pixelation, followed by RGB gains → brightness → contrast → saturation → hue rotation → inversion. Source opacity scales its contribution to the screen blend; master opacity fades the finished picture to black.
