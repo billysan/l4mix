@@ -92,15 +92,16 @@ test('two-file lifecycle, knob interactions, replacement, and clean output', asy
   await page.goto('/');
   const fixture = await clip(page);
   await page.locator('#file-input').setInputFiles([fixture, { ...fixture, name: 'second.webm' }, { ...fixture, name: 'third.webm' }]);
+  await expect(page.locator('.source-row')).toHaveCount(3);
+  await page.locator('.source-row').nth(2).getByRole('button', { name: 'Remove video', exact: true }).click();
   await expect(page.locator('.source-row')).toHaveCount(2);
-  await expect(page.getByText('This version supports two videos', { exact: false })).toBeVisible();
   await expect(page.locator('.source-row').first().locator('small')).toContainText('PLAYING');
-  await expect(page.locator('#empty-add')).toBeDisabled();
+  await expect(page.locator('#empty-add')).toBeEnabled();
   await expect(page.getByRole('button', { name: 'Add videos', exact: true })).toHaveCount(1);
   const first = page.locator('.source-row').first(); const second = page.locator('.source-row').nth(1);
   await expect(first.locator('[role=slider]').first()).toHaveAttribute('aria-valuenow', '0');
   await expect(second.locator('[role=slider]').first()).toHaveAttribute('aria-valuenow', '0');
-  await expect(page.locator('#resolution')).toHaveValue('720');
+  await expect(page.locator('#resolution')).toHaveValue('1080');
   await setValue(first, 0, 100); await setValue(second, 0, 50);
   await expect(page.locator('#signal-label')).toHaveText('V SIGNAL');
   await page.screenshot({ path: testInfo.outputPath('mixer.png'), fullPage: true });
@@ -113,9 +114,9 @@ test('two-file lifecycle, knob interactions, replacement, and clean output', asy
   await expect(page.getByRole('button', { name: /Move layer (up|down)/ })).toHaveCount(0);
   const popupPromise = page.waitForEvent('popup'); await page.locator('#open-output').click(); const popup = await popupPromise;
   await expect.poll(() => popup.locator('video').evaluate(v => v.readyState)).toBeGreaterThanOrEqual(2);
-  expect(await popup.locator('video').evaluate(v => v.videoWidth)).toBe(1280);
-  await page.locator('#resolution').selectOption('1080');
-  await expect.poll(() => popup.locator('video').evaluate(v => v.videoHeight)).toBe(1080);
+  expect(await popup.locator('video').evaluate(v => v.videoWidth)).toBe(1920);
+  await page.locator('#resolution').selectOption('720');
+  await expect.poll(() => popup.locator('video').evaluate(v => v.videoHeight)).toBe(720);
   await popup.getByRole('button', { name: 'Enter fullscreen' }).click();
   await expect.poll(() => popup.evaluate(() => !!document.fullscreenElement)).toBe(true);
   await popup.close();
@@ -143,7 +144,7 @@ test('invalid video gives a recoverable error and compact layout remains usable'
 });
 
 test('software rendering benchmark: two 1080p clips at 720p output', async ({ page }, testInfo) => {
-  await page.goto('/'); const fixture = await clip(page, 1920, 1080);
+  await page.goto('/'); await page.locator('#resolution').selectOption('720'); const fixture = await clip(page, 1920, 1080);
   await page.locator('#file-input').setInputFiles([fixture, { ...fixture, name: 'second-1080p.webm' }]);
   await expect(page.locator('.source-row small').first()).toContainText('PLAYING');
   for (const row of await page.locator('.source-row').all()) { await setValue(row, 0, 50); await setValue(row, 8, 3); await setValue(row, 10, 45); }
@@ -267,12 +268,12 @@ test('centered preview eyes, master controls and replacement through eject', asy
   await page.goto('/'); const fixture = await clip(page);
   await expect(page.locator('#signal-label')).toHaveText('X SIGNAL');
   await expect(page.locator('.signal-controls #reset-all')).toHaveText('RESET');
-  await expect(page.locator('.source-column-label #source-count')).toHaveText('0 / 2');
+  await expect(page.locator('.source-column-label #source-count')).toHaveText('0');
   await expect(page.locator('.matrix-toolbar')).toHaveCount(0);
   await page.locator('#file-input').setInputFiles([fixture, { ...fixture, name: 'second.webm' }]);
   const first = page.locator('.source-row').first(), second = page.locator('.source-row').nth(1), master = page.locator('.master');
   await expect(first.locator('small')).toContainText('PLAYING'); await expect(second.locator('small')).toContainText('PLAYING');
-  await expect(page.locator('.source-column-label #source-count')).toHaveText('2 / 2');
+  await expect(page.locator('.source-column-label #source-count')).toHaveText('2');
   await expect(master.locator('.channel-select')).toHaveText('MASTER');
   await expect(first.getByRole('button', { name: 'Source preview', exact: true })).toHaveAttribute('aria-pressed', 'false');
   await expect(first.locator('video')).toBeHidden();
@@ -309,7 +310,7 @@ test('centered preview eyes, master controls and replacement through eject', asy
   const replacePicker = page.waitForEvent('filechooser'); await first.getByRole('button', { name: 'Eject / replace video', exact: true }).click();
   await (await replacePicker).setFiles({ ...fixture, name: 'replacement-through-eject.webm' });
   await expect(first.locator('strong')).toHaveText('replacement-through-eject.webm'); await expect(first.locator('small')).toContainText('PLAYING');
-  await expect(page.locator('.source-row')).toHaveCount(2); await expect(page.locator('#source-count')).toHaveText('2 / 2');
+  await expect(page.locator('.source-row')).toHaveCount(2); await expect(page.locator('#source-count')).toHaveText('2');
   await expect(first.locator('[role=slider]').first()).toHaveAttribute('aria-valuenow', '0.8');
   await expect(first.getByRole('button', { name: 'Source preview', exact: true })).toHaveAttribute('aria-pressed', 'true');
   await expect(first.locator('video')).toBeVisible();
@@ -324,7 +325,7 @@ test('centered preview eyes, master controls and replacement through eject', asy
   await popup.close();
   await page.screenshot({ path: testInfo.outputPath('transport.png'), fullPage: true });
   await first.getByRole('button', { name: 'Remove video', exact: true }).click(); await expect(page.locator('.source-row')).toHaveCount(1);
-  await expect(page.locator('.source-column-label #source-count')).toHaveText('1 / 2');
+  await expect(page.locator('.source-column-label #source-count')).toHaveText('1');
   await page.locator('.source-row').getByRole('button', { name: 'Remove video', exact: true }).click(); await expect(page.locator('#signal-label')).toHaveText('X SIGNAL');
   expect(errors).toEqual([]);
 });
@@ -552,7 +553,7 @@ test('EDGE detects contours, controls threshold and width, blends, resets and co
 });
 
 test('EDGE software performance with two videos, including RGB shift', async ({ page }, testInfo) => {
-  await page.goto('/'); const fixture = await clip(page, 640, 360);
+  await page.goto('/'); await page.locator('#resolution').selectOption('720'); const fixture = await clip(page, 640, 360);
   await page.locator('#file-input').setInputFiles([fixture, { ...fixture, name: 'second.webm' }]);
   const first = page.locator('.source-row').first(), second = page.locator('.source-row').nth(1);
   await expect(first.locator('small')).toContainText('PLAYING'); await setValue(first, 0, 70); await setValue(second, 0, 40);
@@ -567,4 +568,52 @@ test('EDGE software performance with two videos, including RGB shift', async ({ 
   console.log('EDGE performance:', JSON.stringify(report)); await testInfo.attach('edge-performance', { body: JSON.stringify(report, null, 2), contentType: 'application/json' });
   expect([...baseline, ...edge, ...combined, ...combined360].every(Number.isFinite)).toBe(true); expect(edge.some(f => f > 0)).toBe(true);
   await page.screenshot({ path: testInfo.outputPath('edge-workspace.png'), fullPage: true });
+});
+
+test('1080p is the default and six sources stay selectable, replaceable and aligned', async ({ page }, testInfo) => {
+  const errors = []; page.on('pageerror', error => errors.push(error.message));
+  await page.goto('/');
+  await expect(page.locator('#resolution')).toHaveValue('1080');
+  expect(await page.locator('#output').evaluate(c => [c.width, c.height])).toEqual([1920,1080]);
+  const fixture = await clip(page);
+  const files = Array.from({ length: 6 }, (_, i) => ({ ...fixture, name: `channel-${i + 1}.webm` }));
+  await page.locator('#file-input').setInputFiles(files.slice(0,4));
+  await expect(page.locator('.source-row')).toHaveCount(4);
+  await expect(page.locator('#empty-add')).toBeEnabled();
+  await page.locator('#file-input').setInputFiles(files.slice(4));
+  await expect(page.locator('.source-row')).toHaveCount(6); await expect(page.locator('#source-count')).toHaveText('6');
+  const cells = page.locator('.source-cell');
+  const bounds = await cells.evaluateAll(elements => elements.map(el => { const b = el.getBoundingClientRect(); return { top: b.top, bottom: b.bottom }; }));
+  expect(bounds).toHaveLength(7);
+  for (let i = 1; i < bounds.length; i++) expect(bounds[i].top).toBeGreaterThanOrEqual(bounds[i-1].bottom - 1);
+  for (const row of await page.locator('.source-row').all()) {
+    await expect(row.locator('small')).toContainText('PLAYING'); await setValue(row, 0, 10);
+  }
+  const uploaded = await page.evaluate(async () => {
+    const { Renderer } = await import('/src/renderer.js');
+    return new Promise(resolve => {
+      const original = Renderer.prototype.render;
+      Renderer.prototype.render = function (...args) {
+        const result = original.apply(this, args); Renderer.prototype.render = original;
+        resolve(args[0].filter(source => this.textures.has(source.id)).length); return result;
+      };
+    });
+  });
+  expect(uploaded).toBe(6);
+  const last = page.locator('.source-row').last();
+  await last.locator('.channel-select').click(); await expect(last.locator('.channel-effects')).toBeVisible();
+  await expect(page.locator('.channel-effects:visible')).toHaveCount(1);
+  const input = last.locator('[data-parameter=contrast] input'); await input.fill('1.5'); await input.press('Enter');
+  await last.getByRole('button', { name: 'Eject / replace video', exact: true }).click();
+  await page.locator('#replace-input').setInputFiles({ ...fixture, name: 'sixth-replaced.webm' });
+  await expect(last.locator('strong')).toHaveText('sixth-replaced.webm');
+  await expect(last.locator('[data-parameter=contrast] .knob')).toHaveAttribute('aria-valuenow', '1.5');
+  await last.locator('[data-parameter=contrast] .knob').focus(); await page.keyboard.press('Control+ArrowDown');
+  await expect(page.locator('.master [data-parameter=contrast] .knob')).toBeFocused();
+  await page.locator('.source-row').nth(2).getByRole('button', { name: 'Remove video', exact: true }).click();
+  await expect(page.locator('.source-row')).toHaveCount(5); await expect(page.locator('#source-count')).toHaveText('5');
+  await page.screenshot({ path: testInfo.outputPath('multiple-sources.png'), fullPage: true });
+  await page.setViewportSize({ width: 390, height: 844 });
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
+  await expect(page.locator('#empty-add')).toBeEnabled(); expect(errors).toEqual([]);
 });

@@ -1,9 +1,8 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { PARAMETERS, defaults, clampParameter, formatParameter, MAX_SOURCES } from '../src/parameters.js';
+import { PARAMETERS, defaults, clampParameter, formatParameter } from '../src/parameters.js';
 
-test('both source slots start invisible, while master passes the mix through', () => {
-  assert.equal(MAX_SOURCES, 2);
+test('sources start invisible, while master passes the mix through', () => {
   assert.equal(defaults().opacity, 0);
   assert.equal(defaults(true).opacity, 1);
   assert.equal(defaults().mirrorX, 1);

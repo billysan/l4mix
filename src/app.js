@@ -1,4 +1,4 @@
-import { PARAMETERS, defaults, clampParameter, formatParameter, MAX_SOURCES } from './parameters.js';
+import { PARAMETERS, defaults, clampParameter, formatParameter } from './parameters.js';
 import { Renderer } from './renderer.js';
 import { defaultCorners, validCorners, identityCorners } from './mapping.js';
 import { SourceTransport } from './transport.js';
@@ -178,11 +178,14 @@ function updateMonitor() {
 }
 function updateRows() {
   const container = $('#source-rows');
-  for (const source of sources) {
+  sources.forEach((source, index) => {
+    source.row.style.setProperty('--channel-row', index + 2);
     container.append(source.row);
-  }
-  $('#source-count').textContent = `${sources.length} / ${MAX_SOURCES}`;
-  $('#empty-add').disabled = sources.length >= MAX_SOURCES;
+  });
+  master.row.style.setProperty('--channel-row', sources.length + 2);
+  $('#matrix').style.setProperty('--channel-count', sources.length + 1);
+  $('#matrix').style.setProperty('--workspace-rows', sources.length + 3);
+  $('#source-count').textContent = String(sources.length);
   if (![...sources, master].includes(selectedOwner)) selectedOwner = sources[0] || master;
   selectChannel(selectedOwner);
   renderDirty = true; updateMonitor(); updateMaster(); navigation.refresh();
@@ -280,9 +283,7 @@ function addFiles(files) {
   const accepted = list.filter(file => file.type.startsWith('video/') || /\.(mp4|m4v|mov|webm|ogv|ogg|mkv)$/i.test(file.name));
   if (accepted.length !== list.length) message('Only video files can be added.');
   const wasEmpty = sources.length === 0;
-  const slots = MAX_SOURCES - sources.length;
-  if (accepted.length > slots) message('This version supports two videos at a time. Remove or replace a source to try another.');
-  for (const file of accepted.slice(0, slots)) sources.push(createSource(file));
+  for (const file of accepted) sources.push(createSource(file));
   if (wasEmpty && sources.length) selectedOwner = sources[0];
   updateRows();
 }

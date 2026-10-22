@@ -1,4 +1,3 @@
-export const MAX_SOURCES = 2;
 export const PARAMETERS = [
   { key: 'opacity', label: 'OPACITY', min: 0, max: 1, step: .01, initial: 0, master: 1, unit: '%', scale: 100, group: 'mix' },
   { key: 'inversion', label: 'INVERT', min: 0, max: 1, step: .01, initial: 0, unit: '%', scale: 100 },

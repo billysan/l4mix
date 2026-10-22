@@ -131,17 +131,14 @@ select { background: #262626; color: var(--text); border: 1px solid #4b4b4b; pad
 /* One selected channel, with a shared, grouped workspace. */
 main { grid-template-columns: minmax(0, 4fr) minmax(175px, 1fr); gap: 16px; padding: 16px; }
 .matrix-scroll { overflow: visible; border: 0; scroll-padding: 0; }
-.matrix { display: grid; grid-template-columns: 212px minmax(0, 1fr); grid-template-rows: 48px repeat(3, 112px) 1fr; gap: 0 16px; min-width: 0; min-height: 480px; }
+.matrix { display: grid; grid-template-columns: 212px minmax(0, 1fr); grid-template-rows: 48px repeat(var(--channel-count, 1), 112px) 1fr; gap: 0 16px; min-width: 0; min-height: 480px; }
 .matrix-columns, .matrix-row, #source-rows, #master-row { display: contents; }
 .source-column-label { position: static; grid-column: 1; grid-row: 1; border: 1px solid var(--line); }
-.source-cell { grid-column: 1; position: relative; border: 1px solid var(--line); border-top: 0; cursor: pointer; }
-.master .source-cell { grid-row: 4; }
-.source-row:first-child .source-cell { grid-row: 2; }
-.source-row:nth-child(2) .source-cell { grid-row: 3; }
+.source-cell { grid-column: 1; grid-row: var(--channel-row, 2); position: relative; border: 1px solid var(--line); border-top: 0; cursor: pointer; }
 .channel-selected .source-cell { background: #343330; box-shadow: inset 3px 0 #eee9dd; }
 .channel-select { display: block; border: 0; padding: 0; background: none; width: 100%; text-align: left; color: var(--text); font-size: 10px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .channel-select[aria-pressed=true] { color: #fff; }
-.channel-effects { grid-column: 2; grid-row: 1 / 6; display: grid; grid-template-columns: minmax(75px, .7fr) minmax(0, 2fr); gap: 12px; align-content: start; }
+.channel-effects { grid-column: 2; grid-row: 1 / span var(--workspace-rows, 3); display: grid; grid-template-columns: minmax(75px, .7fr) minmax(0, 2fr); gap: 12px; align-content: start; }
 .effect-group { border: 1px solid var(--line); background: #202020; min-width: 0; }
 .effect-group h2 { height: 29px; display: flex; align-items: center; padding: 0 12px; margin: 0; font: 9px Consolas, monospace; letter-spacing: 1px; color: #dedbd2; background: #292929; border-bottom: 1px solid var(--line); }
 .effect-knobs { display: grid; grid-template-columns: repeat(auto-fit, minmax(63px, 1fr)); padding: 12px 6px; row-gap: 12px; }
@@ -162,9 +159,9 @@ main { grid-template-columns: minmax(0, 4fr) minmax(175px, 1fr); gap: 16px; padd
 @media (max-width: 600px) {
   main { padding: 10px; }
   .matrix { grid-template-columns: minmax(0, 1fr); grid-template-rows: auto; gap: 0; }
-  .source-column-label, .source-cell, .master .source-cell, .source-row:first-child .source-cell, .source-row:nth-child(2) .source-cell, .channel-effects { grid-column: 1; grid-row: auto; }
+  .source-column-label, .source-cell, .channel-effects { grid-column: 1; grid-row: auto; }
   .source-column-label { min-height: 36px; }
-  .channel-effects { grid-row: 5; margin-top: 16px; }
+  .channel-effects { grid-row: var(--workspace-rows, 3); margin-top: 16px; }
   .source-cell { min-height: 88px; }
   .group-colors .effect-knobs, .group-effects .effect-knobs { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 }

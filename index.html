@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-  <meta name="theme-color" content="#141414"><meta name="description" content="A local two-source video mixer.">
+  <meta name="theme-color" content="#141414"><meta name="description" content="A local multi-source video mixer.">
   <title>MIST — video mixer</title>
   <link rel="icon" href="/favicon.svg" type="image/svg+xml"><link rel="stylesheet" href="/style.css">
 </head>
@@ -13,7 +13,7 @@
       <input id="replace-input" type="file" accept="video/*,.mkv,.mov,.webm,.mp4,.m4v,.ogv" hidden>
       <div class="matrix-scroll" tabindex="0" aria-label="Sources and selected channel effects">
         <div class="matrix" id="matrix">
-          <div class="matrix-columns" id="column-headings"><div class="source-column-label"><span>SOURCE</span><span id="source-count" class="source-count">0 / 2</span><button id="empty-add" class="add-source" aria-label="Add videos" title="Add videos">+</button></div></div>
+          <div class="matrix-columns" id="column-headings"><div class="source-column-label"><span>SOURCE</span><span id="source-count" class="source-count">0</span><button id="empty-add" class="add-source" aria-label="Add videos" title="Add videos">+</button></div></div>
           <div id="source-rows"></div>
           <div id="master-row"></div>
         </div>
@@ -22,7 +22,7 @@
     <aside class="monitor-section" aria-label="Mix output and configuration">
       <div class="monitor-shell" id="monitor-shell">
         <div id="mapping-surface" class="mapping-surface">
-          <canvas id="output" width="1280" height="720" aria-label="Combined video output"></canvas>
+          <canvas id="output" width="1920" height="1080" aria-label="Combined video output"></canvas>
           <div id="mapping-overlay" class="mapping-overlay" hidden>
             <svg viewBox="0 0 100 100" preserveAspectRatio="none" aria-hidden="true"><polygon id="mapping-outline" points="0,0 100,0 100,100 0,100"/></svg>
             <button class="mapping-handle" data-corner="0" aria-label="Map top left corner" title="Drag to map top left; double-click to reset"></button>
@@ -35,7 +35,7 @@
       <div class="output-panel">
         <div class="mapping-settings"><label><input id="mapping-toggle" type="checkbox" title="Show or hide mapping handles; the warp stays applied"> MAPPING</label><button id="reset-mapping" class="reset-button" aria-label="Reset mapping" title="Restore all four mapping corners">RESET</button></div>
         <div class="output-settings">
-          <label for="resolution">RESOLUTION <select id="resolution"><option value="360">640 × 360</option><option value="540">960 × 540</option><option value="720" selected>1280 × 720</option><option value="1080">1920 × 1080</option></select></label>
+          <label for="resolution">RESOLUTION <select id="resolution"><option value="360">640 × 360</option><option value="540">960 × 540</option><option value="720">1280 × 720</option><option value="1080" selected>1920 × 1080</option></select></label>
           <button id="open-output" class="button output-button">Open clean output <span aria-hidden="true">↗</span></button>
         </div>
         <div class="signal-controls"><span class="signal-label" id="signal-label" role="status">X SIGNAL</span><button id="reset-all" class="reset-button" title="Reset all source and master effects and output mapping">RESET</button></div>
