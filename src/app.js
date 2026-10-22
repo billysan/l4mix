@@ -94,7 +94,7 @@ const EFFECT_GROUPS = [
   ['EFFECTS', ['inversion', 'mirrorX', 'mirrorY', 'pixelation'], '🧪 FX'],
   ['RGB SHIFT', ['redX', 'redY', 'greenX', 'greenY', 'blueX', 'blueY'], '🧲 RGB SHIFT'],
   ['SLIDE', ['slideX', 'slideY', 'rotation'], '🎡 SLIDE'],
-  ['EDGE', ['edgeAmount', 'edgeThreshold', 'edgeWidth']],
+  ['EDGE', ['edgeAmount', 'edgeThreshold', 'edgeWidth'], '⚡ EDGE'],
 ];
 function effectPanel(owner) {
   const panel = document.createElement('div'); panel.className = 'channel-effects'; owner.panel = panel;
