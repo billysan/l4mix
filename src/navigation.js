@@ -25,6 +25,7 @@ export function controlNavigation(matrix, channels) {
       const row = owner.row;
       const general = [row.querySelector('.preview-eye'), row.querySelector('.channel-select'), row.querySelector('.transport .icon-button'), row.querySelector('.transport .icon-button:nth-child(2)'), row.querySelector('.reset-button'), row.querySelector('.row-operations button')];
       general.forEach((control, index) => { if (control) control.dataset.navColumn = index; });
+      row.querySelectorAll('.seek-button').forEach((control, index) => { control.dataset.navColumn = 4.25 + index * .25; });
       const knobs = row.querySelectorAll('.knob');
       knobs.forEach((control, index) => { control.dataset.navColumn = 6 + index; });
       row.querySelectorAll('.mapping-reset').forEach((control, index) => { control.dataset.navColumn = 6 + knobs.length + index; });

@@ -1,24 +1,24 @@
 import { test, expect } from '@playwright/test';
 
-async function clip(page, width = 320, height = 180) {
+async function clip(page, width = 320, height = 180, frameCount = 18) {
   await page.evaluate(async () => { await document.fonts.ready; await new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve))); });
-  const bytes = await page.evaluate(async ({ width, height }) => {
+  const bytes = await page.evaluate(async ({ width, height, frameCount }) => {
     const c = document.createElement('canvas'); c.width = width; c.height = height;
     const ctx = c.getContext('2d'); const stream = c.captureStream(0);
     const track = stream.getVideoTracks()[0];
     const recorder = new MediaRecorder(stream, { mimeType: 'video/webm;codecs=vp8' });
     const chunks = []; recorder.ondataavailable = e => chunks.push(e.data);
     const done = new Promise(resolve => { recorder.onstop = resolve; }); recorder.start();
-    for (let i = 0; i < 18; i++) {
+    for (let i = 0; i < frameCount; i++) {
       ctx.fillStyle = '#d05b32'; ctx.fillRect(0, 0, width / 2, height);
       ctx.fillStyle = '#588fc4'; ctx.fillRect(width / 2, 0, width / 2, height);
-      ctx.fillStyle = '#d8fa77'; ctx.fillRect((i / 18) * width, height / 4, width / 8, height / 2);
+      ctx.fillStyle = '#d8fa77'; ctx.fillRect((i / frameCount) * width, height / 4, width / 8, height / 2);
       track.requestFrame();
       await new Promise(r => requestAnimationFrame(() => setTimeout(r, 34)));
     }
     recorder.stop(); await done; stream.getTracks().forEach(t => t.stop());
     return Array.from(new Uint8Array(await new Blob(chunks, { type: 'video/webm' }).arrayBuffer()));
-  }, { width, height });
+  }, { width, height, frameCount });
   return { name: 'test-pattern.webm', mimeType: 'video/webm', buffer: Buffer.from(bytes) };
 }
 async function setValue(row, key, value) {
@@ -327,7 +327,7 @@ test('Ctrl+arrows navigate channel controls and knobs without changing their val
   await move('ArrowDown'); await expect(master.locator('[role=slider]').nth(1)).toBeFocused();
   await move('ArrowUp'); await expect(second.locator('[role=slider]').nth(1)).toBeFocused();
   await move('ArrowLeft'); await expect(second.locator('[role=slider]').nth(0)).toBeFocused();
-  for (const label of ['Remove video', 'Reset source effects', 'Eject / replace video', 'Pause video', 'Select source 2', 'Source preview']) {
+  for (const label of ['Remove video', 'Random position', 'Forward 5 seconds', 'Back 5 seconds', 'Reset source effects', 'Eject / replace video', 'Pause video', 'Select source 2', 'Source preview']) {
     await move('ArrowLeft'); await expect(second.getByRole('button', { name: label, exact: true })).toBeFocused();
   }
   await move('ArrowLeft'); await expect(second.getByRole('button', { name: 'Source preview', exact: true })).toBeFocused();
@@ -726,4 +726,38 @@ test('mapping render benchmark at 1080p with three sources', async ({ page }, te
   await testInfo.attach('mapping-performance', { body: JSON.stringify(report, null, 2), contentType: 'application/json' });
   expect([report.baselineMs, report.sourceMappingMs, report.sourceAndMasterMappingMs].every(n => Number.isFinite(n) && n > 0)).toBe(true);
   expect(report.renderedPixel.slice(0,3).some(n => n > 0)).toBe(true);
+});
+
+test('video jump buttons seek five seconds and randomly without changing playback or other channels', async ({ page }, testInfo) => {
+  const errors = []; page.on('pageerror', error => errors.push(error.message));
+  await page.goto('/'); const fixture = await clip(page,320,180,180);
+  await page.locator('#file-input').setInputFiles([fixture, { ...fixture, name: 'second.webm' }]);
+  const first = page.locator('.source-row').first(), second = page.locator('.source-row').nth(1), video = first.locator('video'), master = page.locator('.master');
+  await expect(first.locator('small')).toContainText('PLAYING'); await expect(second.locator('small')).toContainText('PLAYING');
+  for (const row of [first,second]) await row.getByRole('button', { name: 'Pause video', exact: true }).click();
+  for (const label of ['Back 5 seconds','Forward 5 seconds','Random position']) await expect(first.getByRole('button', { name: label, exact: true })).toBeEnabled();
+  const otherTime = await second.locator('video').evaluate(v => v.currentTime);
+  await first.getByRole('button', { name: 'Back 5 seconds', exact: true }).click();
+  await expect.poll(() => video.evaluate(v => v.currentTime)).toBe(0);
+  await first.getByRole('button', { name: 'Forward 5 seconds', exact: true }).click();
+  await expect.poll(() => video.evaluate(v => v.currentTime)).toBe(5);
+  await expect.poll(() => video.evaluate(v => v.seeking)).toBe(false);
+  expect(await video.evaluate(v => v.paused)).toBe(true);
+  const end = await video.evaluate(v => (Number.isFinite(v.duration) ? v.duration : v.seekable.end(v.seekable.length - 1)) - .001);
+  expect(end).toBeGreaterThan(5);
+  await page.evaluate(() => { window.originalTestRandom = Math.random; Math.random = () => .5; });
+  await first.getByRole('button', { name: 'Random position', exact: true }).click();
+  await expect.poll(() => video.evaluate(v => v.currentTime)).toBeCloseTo(end * .5, 2);
+  await page.evaluate(() => { Math.random = window.originalTestRandom; delete window.originalTestRandom; });
+  expect(await video.evaluate(v => v.paused)).toBe(true);
+  expect(await second.locator('video').evaluate(v => v.currentTime)).toBe(otherTime);
+  await first.getByRole('button', { name: 'Play video', exact: true }).click();
+  await first.getByRole('button', { name: 'Back 5 seconds', exact: true }).click();
+  expect(await video.evaluate(v => v.paused)).toBe(false); await expect(first.locator('small')).toContainText('PLAYING');
+  await master.getByRole('button', { name: 'Pause all sources', exact: true }).click();
+  await first.getByRole('button', { name: 'Forward 5 seconds', exact: true }).click();
+  expect(await video.evaluate(v => v.paused)).toBe(true); await expect(first.locator('small')).toContainText('PAUSED');
+  await master.getByRole('button', { name: 'Resume all sources', exact: true }).click();
+  await expect(first.locator('small')).toContainText('PLAYING'); await expect(second.locator('small')).toContainText('PAUSED');
+  await page.screenshot({ path: testInfo.outputPath('seek-controls.png'), fullPage: true }); expect(errors).toEqual([]);
 });

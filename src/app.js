@@ -147,6 +147,7 @@ const masterTransport = document.createElement('div'); masterTransport.className
 const masterPlay = iconButton('pause', 'Pause all sources', toggleMasterPause);
 const masterReset = sourceButton('RESET', 'Reset master effects', () => reset(master)); masterReset.className = 'reset-button';
 masterTransport.append(masterPlay, masterReset); masterDetails.append(masterTransport);
+const masterSeekSpace = document.createElement('div'); masterSeekSpace.className = 'seek-controls seek-placeholder'; masterSeekSpace.setAttribute('aria-hidden', 'true'); masterDetails.append(masterSeekSpace);
 const masterOperations = document.createElement('div'); masterOperations.className = 'row-operations';
 masterLabel.append(masterThumb, masterDetails, masterOperations);
 masterRow.append(masterLabel, effectPanel(master)); $('#master-row').append(masterRow);
@@ -202,7 +203,7 @@ function sourceButton(text, label, action) {
 }
 function sourceError(source, text) {
   if (source.removed) return;
-  source.error = true; clearTimeout(source.loadTimeout); source.transport.pause(); source.status.textContent = 'PLAYBACK ERROR'; source.status.classList.add('error'); source.dirty = true; renderDirty = true;
+  source.error = true; source.seekButtons?.forEach(button => { button.disabled = true; }); clearTimeout(source.loadTimeout); source.transport.pause(); source.status.textContent = 'PLAYBACK ERROR'; source.status.classList.add('error'); source.dirty = true; renderDirty = true;
   message(`${source.file.name}: ${text} Try replacing it with a browser-playable MP4 or WebM.`, true); updateMonitor();
 }
 function setIcon(button, name, label) {
@@ -259,7 +260,13 @@ function createSource(file, existing = null) {
   const playButton = iconButton('pause', 'Pause video', togglePlayback); source.playButton = playButton;
   const eject = iconButton('eject', 'Eject / replace video', () => { replacementId = source.id; $('#replace-input').click(); });
   const resetSource = sourceButton('RESET', 'Reset source effects', () => reset(source)); resetSource.className = 'reset-button';
-  transport.append(playButton, eject, resetSource); details.append(nameButton, status, transport);
+  const seekControls = document.createElement('div'); seekControls.className = 'seek-controls';
+  const back = sourceButton('−5s', 'Back 5 seconds', () => source.transport.seekBy(-5));
+  const forward = sourceButton('+5s', 'Forward 5 seconds', () => source.transport.seekBy(5));
+  const random = iconButton('shuffle', 'Random position', () => source.transport.seekRandom());
+  source.seekButtons = [back, forward, random];
+  source.seekButtons.forEach(button => { button.className = 'seek-button'; button.disabled = true; seekControls.append(button); });
+  transport.append(playButton, eject, resetSource); details.append(nameButton, status, transport, seekControls);
   const operations = document.createElement('div'); operations.className = 'row-operations';
   operations.append(sourceButton('×', 'Remove video', () => removeSource(source)));
   cell.append(thumb, details, operations); row.append(cell, effectPanel(source));
@@ -269,12 +276,13 @@ function createSource(file, existing = null) {
     status.textContent = `${video.videoWidth}×${video.videoHeight} · ${paused ? 'PAUSED' : 'PLAYING'}`;
     setIcon(playButton, paused ? 'play' : 'pause', paused ? 'Play video' : 'Pause video');
     playButton.disabled = master.paused;
+    source.seekButtons.forEach(button => { button.disabled = !source.transport.canSeek; });
     updateSourcePreview(source); renderDirty = true; updateMonitor();
   };
   updateSourcePreview(source);
   video.addEventListener('loadeddata', () => { if (source.removed) return; clearTimeout(source.loadTimeout); source.dirty = true; source.updateStatus(); play(source); });
   video.addEventListener('error', () => { clearTimeout(source.loadTimeout); sourceError(source, 'Unsupported codec, damaged file, or decoding failure.'); });
-  for (const event of ['play', 'pause', 'ended', 'seeked']) video.addEventListener(event, source.updateStatus);
+  for (const event of ['play', 'pause', 'ended', 'seeked', 'loadedmetadata', 'durationchange', 'progress']) video.addEventListener(event, source.updateStatus);
   video.addEventListener('seeked', () => { source.dirty = true; });
   video.addEventListener('timeupdate', () => { if (!video.requestVideoFrameCallback) source.dirty = true; });
   if (video.requestVideoFrameCallback) {
