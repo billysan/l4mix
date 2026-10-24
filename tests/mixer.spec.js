@@ -785,3 +785,50 @@ test('YouTube dialog loads a downloaded source, reports errors and cancels', asy
   await page.keyboard.press('Escape');
   await expect(page.locator('#download-dialog')).not.toBeVisible();
 });
+
+test('rendering follows 144 Hz ticks without a cap and only one window drives the mix', async ({ page }) => {
+  await page.addInitScript(() => {
+    const raf = window.requestAnimationFrame.bind(window);
+    window.requestAnimationFrame = callback => raf(now => {
+      if (window.manualMixerFrames) window.nextMixerFrame = callback;
+      else callback(now);
+    });
+  });
+  await page.goto('/'); await page.selectOption('#resolution', '360');
+  const fixture = await clip(page);
+  await page.locator('#file-input').setInputFiles(fixture);
+  await expect(page.locator('.source-row small')).toContainText('PLAYING');
+  await setValue(page.locator('.source-row'), 0, 100);
+  await page.evaluate(async () => {
+    const { Renderer } = await import('/src/renderer.js');
+    const render = Renderer.prototype.render;
+    window.renderCalls = 0;
+    Renderer.prototype.render = function (...args) { window.renderCalls++; return render.apply(this, args); };
+    window.manualMixerFrames = true;
+  });
+  await expect.poll(() => page.evaluate(() => !!window.nextMixerFrame)).toBe(true);
+  const ticks = () => {
+    const before = window.renderCalls;
+    for (let i = 0; i < 24; i++) {
+      const callback = window.nextMixerFrame;
+      window.nextMixerFrame = null;
+      // Keep the next tick under test control instead of scheduling real RAFs.
+      const raf = window.requestAnimationFrame;
+      window.requestAnimationFrame = next => { window.nextMixerFrame = next; return 0; };
+      callback(performance.now() + i * 1000 / 144);
+      window.requestAnimationFrame = raf;
+    }
+    return window.renderCalls - before;
+  };
+  expect(await page.evaluate(ticks)).toBe(24);
+  const popupPromise = page.waitForEvent('popup'); await page.click('#open-output'); const popup = await popupPromise;
+  await expect.poll(() => popup.locator('video').evaluate(video => video.readyState)).toBeGreaterThanOrEqual(2);
+  expect(await page.evaluate(ticks)).toBe(0);
+  expect(await popup.evaluate(() => {
+    const before = opener.renderCalls;
+    for (let i = 0; i < 24; i++) opener.dispatchEvent(new CustomEvent('mist-output-frame', { detail: { output: window, time: performance.timeOrigin + performance.now() + i * 1000 / 144 } }));
+    return opener.renderCalls - before;
+  })).toBe(24);
+  await popup.close();
+  expect(await page.evaluate(ticks)).toBe(24);
+});

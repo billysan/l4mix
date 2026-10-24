@@ -8,7 +8,7 @@ const $ = selector => document.querySelector(selector);
 const sources = [];
 const master = { id: 'master', values: defaults(true), controls: new Map(), paused: false, preview: true };
 let renderer, nextId = 1, replacementId = null, outputWindow = null, outputStream = null;
-let renderDirty = true, lastRender = -Infinity, lastStats = performance.now(), frames = 0, disposed = false;
+let renderDirty = true, lastStats = performance.now(), frames = 0, disposed = false;
 const canvas = $('#output');
 let selectedOwner = master;
 let renderTime = 0;
@@ -363,7 +363,7 @@ window.addEventListener('mist-output-ready', e => {
     if (!canvas.captureStream) throw new Error('Canvas streaming is unavailable in this browser. Try a current Chromium or Firefox browser.');
     outputStream = canvas.captureStream(0);
     if (typeof outputStream.getVideoTracks()[0]?.requestFrame !== 'function') {
-      stopOutputStream(); outputStream = canvas.captureStream(30);
+      stopOutputStream(); outputStream = canvas.captureStream();
     }
     outputWindow.setMixerStream(outputStream); renderDirty = true;
     outputWindow.addEventListener('pagehide', () => { stopOutputStream(); $('#open-output').innerHTML = 'Open clean output <span aria-hidden="true">↗</span>'; });
@@ -375,10 +375,12 @@ $('#open-output').onclick = () => {
   outputWindow = window.open('/output.html', 'mist-clean-output', 'popup,width=960,height=540');
   if (!outputWindow) message('The output window was blocked. Allow pop-ups for this local site, then click Open clean output again.', true);
 };
+function outputDrivesFrames() {
+  return !!(outputStream && outputWindow && !outputWindow.closed && !outputWindow.document.hidden);
+}
 function renderFrame(now, fromOutput = false) {
-  if (disposed) return;
-  // Leave the compositor at 30 Hz even on high-refresh-rate displays.
-  if (now - lastRender < 1000 / 30 - 1) return;
+  // Exactly one window drives the mix, at its native animation-frame cadence.
+  if (disposed || fromOutput !== outputDrivesFrames()) return;
   const playing = sources.some(s => !s.error && !s.transport.paused && s.values.opacity > 0);
   if (document.hidden && !fromOutput) return;
   if (renderer && (master.preview || (outputWindow && !outputWindow.closed)) && (renderDirty || playing || sources.some(s => s.dirty && s.values.opacity > 0))) {
@@ -393,7 +395,6 @@ function renderFrame(now, fromOutput = false) {
     }
     catch (error) { message(`Rendering stopped: ${error.message}. Try 720p or reload the mixer.`, true); renderer = null; }
   }
-  lastRender = now;
   if (now - lastStats >= 1000) {
     const fps = frames * 1000 / (now - lastStats); $('#fps').textContent = Math.round(fps);
     $('#performance-dot').classList.toggle('slow', playing && fps < 24);
