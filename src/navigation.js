@@ -4,7 +4,7 @@ export function controlNavigation(matrix, channels) {
   let selected = null, previousIndex = 0, preferred = 0, moving = false;
   const available = control => control?.isConnected && !control.disabled && control.getClientRects().length > 0;
   const ownerOf = control => channels.owners().find(owner => owner.row.contains(control));
-  const controls = owner => [...owner.row.querySelectorAll('[data-nav-column]')].filter(available);
+  const controls = owner => [...owner.row.querySelectorAll('[data-nav-column]')].filter(available).sort((a, b) => Number(a.dataset.navColumn) - Number(b.dataset.navColumn));
   function mark(control) {
     selected?.classList.remove('control-selected'); selected = control;
     selected?.classList.add('control-selected');
@@ -25,7 +25,9 @@ export function controlNavigation(matrix, channels) {
       const row = owner.row;
       const general = [row.querySelector('.preview-eye'), row.querySelector('.channel-select'), row.querySelector('.transport .icon-button'), row.querySelector('.transport .icon-button:nth-child(2)'), row.querySelector('.reset-button'), row.querySelector('.row-operations button')];
       general.forEach((control, index) => { if (control) control.dataset.navColumn = index; });
-      row.querySelectorAll('.knob').forEach((control, index) => { control.dataset.navColumn = 6 + index; });
+      const knobs = row.querySelectorAll('.knob');
+      knobs.forEach((control, index) => { control.dataset.navColumn = 6 + index; });
+      row.querySelectorAll('.mapping-reset').forEach((control, index) => { control.dataset.navColumn = 6 + knobs.length + index; });
     }
     if (selected && !selected.isConnected) {
       const owner = channels.owners()[Math.min(previousIndex, channels.owners().length - 1)];

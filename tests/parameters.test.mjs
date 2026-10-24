@@ -24,3 +24,14 @@ test('numeric input clamps and quantizes without NaN or fractional mirror counts
   assert.equal(formatParameter(opacity, .5), '50%');
   assert.equal(formatParameter(PARAMETERS.find(p => p.key === 'slideX'), .001), '+0.1%');
 });
+
+test('mapping bounds keep a nonempty ordered rectangle for either channel type', () => {
+  for (const master of [false, true]) {
+    const values = defaults(master);
+    assert.deepEqual(['mapX1','mapX2','mapY1','mapY2'].map(key => values[key]), [0,1,0,1]);
+    values.mapX2 = .6;
+    assert.equal(clampParameter(PARAMETERS.find(p => p.key === 'mapX1'), .9, values), .599);
+    values.mapY1 = .4;
+    assert.equal(clampParameter(PARAMETERS.find(p => p.key === 'mapY2'), .1, values), .401);
+  }
+});

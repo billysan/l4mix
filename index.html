@@ -26,18 +26,10 @@
       <div class="monitor-shell" id="monitor-shell">
         <div id="mapping-surface" class="mapping-surface">
           <canvas id="output" width="1920" height="1080" aria-label="Combined video output"></canvas>
-          <div id="mapping-overlay" class="mapping-overlay" hidden>
-            <svg viewBox="0 0 100 100" preserveAspectRatio="none" aria-hidden="true"><polygon id="mapping-outline" points="0,0 100,0 100,100 0,100"/></svg>
-            <button class="mapping-handle" data-corner="0" aria-label="Map top left corner" title="Drag to map top left; double-click to reset"></button>
-            <button class="mapping-handle" data-corner="1" aria-label="Map top right corner" title="Drag to map top right; double-click to reset"></button>
-            <button class="mapping-handle" data-corner="2" aria-label="Map bottom right corner" title="Drag to map bottom right; double-click to reset"></button>
-            <button class="mapping-handle" data-corner="3" aria-label="Map bottom left corner" title="Drag to map bottom left; double-click to reset"></button>
-          </div>
         </div>
       </div>
       <div class="output-panel">
         <div class="theme-settings"><label for="theme">THEME <select id="theme"><option value="classic">CLASSIC</option><option value="dark">DARK</option><option value="sunset">SUNSET</option><option value="tropicana">TROPICANA</option></select></label></div>
-        <div class="mapping-settings"><label><input id="mapping-toggle" type="checkbox" title="Show or hide mapping handles; the warp stays applied"> MAPPING</label><button id="reset-mapping" class="reset-button" aria-label="Reset mapping" title="Restore all four mapping corners">RESET</button></div>
         <div class="output-settings">
           <label for="resolution">RESOLUTION <select id="resolution"><option value="360">640 × 360</option><option value="540">960 × 540</option><option value="720">1280 × 720</option><option value="1080" selected>1920 × 1080</option></select></label>
           <button id="open-output" class="button output-button">Open clean output <span aria-hidden="true">↗</span></button>

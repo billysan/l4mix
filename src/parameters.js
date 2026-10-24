@@ -19,13 +19,19 @@ export const PARAMETERS = [
     key, label: ({redX: 'R X', redY: 'R Y', greenX: 'G X', greenY: 'G Y', blueX: 'B X', blueY: 'B Y', slideX: 'X', slideY: 'Y'})[key],
     min: -1, max: 1, step: .001, initial: 0, unit: '%', scale: 100, signed: true,
   })),
+  ...['mapX1', 'mapX2', 'mapY1', 'mapY2'].map(key => ({ key, label: key.slice(3).toUpperCase(), min: 0, max: 1, step: .001, initial: key.endsWith('2') ? 1 : 0, scale: 100, unit: '%' })),
 ];
 export function defaults(master = false) {
   return Object.fromEntries(PARAMETERS.map(p => [p.key, master ? (p.master ?? p.initial) : p.initial]));
 }
-export function clampParameter(p, value) {
+export function clampParameter(p, value, values = null) {
   if (!Number.isFinite(value)) return p.initial;
-  return Number(Math.min(p.max, Math.max(p.min, Math.round(value / p.step) * p.step)).toFixed(4));
+  let result = Math.min(p.max, Math.max(p.min, Math.round(value / p.step) * p.step));
+  if (values && /^map[XY][12]$/.test(p.key)) {
+    const axis = p.key.slice(0, -1);
+    result = p.key.endsWith('1') ? Math.min(result, (values[axis + '2'] ?? 1) - p.step) : Math.max(result, (values[axis + '1'] ?? 0) + p.step);
+  }
+  return Number(result.toFixed(4));
 }
 export function formatParameter(p, value) {
   const scaled = value * (p.scale || 1);

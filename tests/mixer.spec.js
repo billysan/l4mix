@@ -164,7 +164,7 @@ test('software rendering benchmark: two 1080p clips at 720p output', async ({ pa
   expect(fps.some(n => n > 0)).toBe(true); await popup.close();
 });
 
-test('compact grayscale layout and four-corner output mapping', async ({ page }, testInfo) => {
+test('compact grayscale layout and master mapping controls inside the table', async ({ page }, testInfo) => {
   const errors = []; page.on('pageerror', e => errors.push(e.message));
   await page.goto('/');
   const fixture = await clip(page);
@@ -184,51 +184,28 @@ test('compact grayscale layout and four-corner output mapping', async ({ page },
   await expect(page.locator('label[for=resolution]')).toContainText('RESOLUTION');
   const color = await page.locator('.channel-effects:not([hidden]) .effect-group').first().evaluate(el => getComputedStyle(el).borderColor);
   const rgb = color.match(/\d+/g).map(Number); expect(rgb[0]).toBeGreaterThan(rgb[1]); expect(rgb[1]).toBe(rgb[2]); expect(rgb[0] - rgb[1]).toBeLessThan(60);
-  const handles = page.locator('.mapping-handle'); await expect(handles.first()).toBeHidden();
-  await page.locator('#mapping-toggle').check(); await expect(handles).toHaveCount(4); await expect(handles.first()).toBeVisible();
-  const bounds = await page.locator('#mapping-surface').boundingBox();
-  await page.mouse.move(bounds.x, bounds.y); await page.mouse.down(); await page.mouse.move(bounds.x + bounds.width * .18, bounds.y + bounds.height * .2, { steps: 8 }); await page.mouse.up();
-  const moved = await handles.first().evaluate(el => [el.style.getPropertyValue('--x'), el.style.getPropertyValue('--y')]);
-  expect(parseFloat(moved[0])).toBeCloseTo(18, 0); expect(parseFloat(moved[1])).toBeCloseTo(20, 0);
+  const master = page.locator('.master'); await master.locator('.channel-select').click();
+  await expect(master.locator('.group-mapping')).toBeVisible();
+  await expect(page.locator('.monitor-section .group-mapping')).toHaveCount(0);
+  await expect(page.locator('.mapping-handle')).toHaveCount(0);
+  const setMap = async (key, value) => { const input = master.locator(`[data-parameter=${key}] input`); await input.fill(String(value)); await input.press('Enter'); };
+  await setMap('mapX1', 18); await setMap('mapY1', 20);
   await page.screenshot({ path: testInfo.outputPath('mapping.png'), fullPage: true });
-  // The popup receives the warped pixels and never receives editing markers.
   const popupPromise = page.waitForEvent('popup'); await page.locator('#open-output').click(); const popup = await popupPromise;
   await expect.poll(() => popup.locator('video').evaluate(v => v.readyState)).toBeGreaterThanOrEqual(2);
-  const pixels = await popup.locator('video').evaluate(video => {
-    const c = document.createElement('canvas'); c.width = video.videoWidth; c.height = video.videoHeight;
-    const ctx = c.getContext('2d'); ctx.drawImage(video, 0, 0);
-    return { outside: [...ctx.getImageData(2,2,1,1).data], center: [...ctx.getImageData(c.width/2,c.height/2,1,1).data] };
-  });
-  expect(pixels.outside.slice(0,3).every(v => v < 5)).toBe(true); expect(pixels.center.slice(0,3).some(v => v > 30)).toBe(true);
-  await expect(popup.locator('.mapping-handle')).toHaveCount(0);
-  await page.locator('#mapping-toggle').uncheck(); await expect(handles.first()).toBeHidden();
-  await expect(page.locator('#reset-mapping')).toBeEnabled();
-  // Hiding editing guides must retain the warped pixels in both destinations.
-  const monitorPixels = await page.evaluate(async () => {
-    const { Renderer } = await import('/src/renderer.js');
-    return new Promise(resolve => {
-      const original = Renderer.prototype.render;
-      Renderer.prototype.render = function (...args) {
-        const result = original.apply(this, args), corner = new Uint8Array(4), center = new Uint8Array(4);
-        this.gl.readPixels(2, this.canvas.height - 3, 1, 1, this.gl.RGBA, this.gl.UNSIGNED_BYTE, corner);
-        this.gl.readPixels(this.canvas.width / 2, this.canvas.height / 2, 1, 1, this.gl.RGBA, this.gl.UNSIGNED_BYTE, center);
-        Renderer.prototype.render = original; resolve({ corner: [...corner], center: [...center] }); return result;
-      };
-    });
-  });
-  expect(monitorPixels.corner.slice(0,3).every(v => v < 5)).toBe(true); expect(monitorPixels.center.slice(0,3).some(v => v > 30)).toBe(true);
   await expect.poll(() => popup.locator('video').evaluate(video => {
     const c = document.createElement('canvas'); c.width = video.videoWidth; c.height = video.videoHeight;
-    const ctx = c.getContext('2d'); ctx.drawImage(video, 0, 0); return [...ctx.getImageData(2,2,1,1).data].slice(0,3).every(v => v < 5);
+    const ctx = c.getContext('2d'); ctx.drawImage(video, 0, 0);
+    const outside = ctx.getImageData(2,2,1,1).data, center = ctx.getImageData(c.width/2,c.height/2,1,1).data;
+    return [...outside].slice(0,3).every(v => v < 5) && [...center].slice(0,3).some(v => v > 30);
   })).toBe(true);
+  await expect(popup.locator('.mapping-handle')).toHaveCount(0);
   await popup.close();
-  await page.locator('#mapping-toggle').check(); expect(await handles.first().evaluate(el => el.style.getPropertyValue('--x'))).toBe(moved[0]);
-  await handles.first().focus(); await handles.first().press('ArrowRight');
-  expect(parseFloat(await handles.first().evaluate(el => el.style.getPropertyValue('--x')))).toBeGreaterThan(parseFloat(moved[0]));
-  await page.locator('#reset-mapping').click(); expect(await handles.first().evaluate(el => el.style.getPropertyValue('--x'))).toBe('0%');
-  await handles.first().press('ArrowRight'); await page.locator('#reset-all').click();
-  await expect(page.locator('#mapping-toggle')).not.toBeChecked(); await expect(handles.first()).toBeHidden();
-  expect(await handles.first().evaluate(el => el.style.getPropertyValue('--x'))).toBe('0%');
+  await master.locator('.mapping-reset').click();
+  await expect(master.locator('[data-parameter=mapX1] .knob')).toHaveAttribute('aria-valuenow', '0');
+  await expect(master.locator('[data-parameter=mapY1] .knob')).toHaveAttribute('aria-valuenow', '0');
+  await setMap('mapX1', 10); await page.locator('#reset-all').click();
+  await expect(master.locator('[data-parameter=mapX1] .knob')).toHaveAttribute('aria-valuenow', '0');
   await expect(row.locator('[role=slider]').first()).toHaveAttribute('aria-valuenow', '0');
   expect(errors).toEqual([]);
 });
@@ -361,12 +338,13 @@ test('Ctrl+arrows navigate channel controls and knobs without changing their val
   await move('ArrowDown'); await expect(master.getByRole('button', { name: 'Pause all sources', exact: true })).toBeFocused();
   await move('ArrowUp'); await expect(second.getByRole('button', { name: 'Eject / replace video', exact: true })).toBeFocused();
   await second.locator('[role=slider]').nth(0).focus();
-  for (let i = 0; i < 23; i++) await move('ArrowRight');
+  for (let i = 0; i < 27; i++) await move('ArrowRight');
   const last = second.locator('[role=slider]').last(); await expect(last).toBeFocused();
   expect(await last.evaluate(el => { const b = el.getBoundingClientRect(); return el.contains(document.elementFromPoint(b.x + b.width / 2, b.y + b.height / 2)); })).toBe(true);
   await expect(page.locator('.control-selected')).toHaveCount(1);
   await page.screenshot({ path: testInfo.outputPath('keyboard-selection.png'), fullPage: true });
-  await move('ArrowRight'); await expect(last).toBeFocused();
+  await move('ArrowRight'); await expect(second.locator('.mapping-reset')).toBeFocused();
+  await move('ArrowLeft'); await expect(last).toBeFocused();
   // Mouse selection and plain arrow adjustment remain available.
   await second.locator('[role=slider]').nth(1).click(); await expect(second.locator('[role=slider]').nth(1)).toHaveClass(/control-selected/);
   await page.keyboard.press('ArrowUp'); await expect(second.locator('[role=slider]').nth(1)).toHaveAttribute('aria-valuenow', '1.05');
@@ -409,7 +387,7 @@ test('selected channel workspace groups effects and retains each channel state',
   await expect(page.locator('#channel-title')).toHaveCount(0);
   const panelBounds = await first.locator('.channel-effects').boundingBox(), monitorBounds = await page.locator('.monitor-section').boundingBox(), listBounds = await page.locator('.source-column-label').boundingBox();
   expect(panelBounds.y).toBeCloseTo(monitorBounds.y, 0); expect(panelBounds.y).toBeCloseTo(listBounds.y, 0);
-  await expect(first.locator('.effect-group h2')).toHaveText(['👻 OPACITY', '🔴🟢🔵 RGB', '🎨 COLORS', '🧪 FX', '🧲 RGB SHIFT', '🎡 SLIDE', '⚡ EDGE']);
+  await expect(first.locator('.effect-group h2')).toHaveText(['👻 OPACITY', '🔴🟢🔵 RGB', '🎨 COLORS', '🧪 FX', '🧲 RGB SHIFT', '🎡 SLIDE', '⚡ EDGE', /🗺️ MAPPING/]);
   await setValue(first, 0, 65); await setValue(first, 3, 1.2);
   await setValue(second, 0, 35); await setValue(second, 10, 30);
   await first.locator('.channel-select').click();
@@ -657,4 +635,95 @@ test('theme selection works when local storage is blocked', async ({ page }) => 
   await page.goto('/'); await expect(page.locator('#theme')).toHaveValue('classic');
   await page.locator('#theme').selectOption('sunset'); await expect(page.locator('html')).toHaveAttribute('data-theme', 'sunset');
   await page.reload(); await expect(page.locator('#theme')).toHaveValue('classic'); expect(errors).toEqual([]);
+});
+
+test('independent channel bounds compose before master mapping without extra source passes', async ({ page }) => {
+  await page.goto('/');
+  const result = await page.evaluate(async () => {
+    const { Renderer } = await import('/src/renderer.js'), { defaults } = await import('/src/parameters.js');
+    const output = document.createElement('canvas'); output.width = output.height = 8; const r = new Renderer(output), master = defaults(true);
+    const source = (id, color, bounds) => {
+      const c = document.createElement('canvas'); c.width = c.height = 8; const ctx = c.getContext('2d'); ctx.fillStyle = color; ctx.fillRect(0,0,8,8);
+      Object.defineProperties(c, { videoWidth: { value: 8 }, videoHeight: { value: 8 }, readyState: { value: 4 } });
+      return { id, video: c, values: { ...defaults(), opacity: 1, ...bounds }, dirty: true };
+    };
+    const red = source('red', 'red', { mapX2: .5 }), blue = source('blue', 'blue', { mapX1: .5 });
+    const pixel = (x,y = 4) => { const b = new Uint8Array(4); r.gl.readPixels(x,y,1,1,r.gl.RGBA,r.gl.UNSIGNED_BYTE,b); return [...b]; };
+    let draws = 0; const draw = r.gl.drawArrays.bind(r.gl); r.gl.drawArrays = (...args) => { draws++; return draw(...args); };
+    r.render([red,blue], master); const sourceOnly = { left: pixel(1), right: pixel(6), draws, textures: r.textures.size };
+    draws = 0; r.render([red,blue], { ...master, mapX1: .25, mapX2: .75, mapY1: .25, mapY2: .75 });
+    const combined = { outside: pixel(0), left: pixel(3), right: pixel(4), draws };
+    red.values.mapX2 = .25; r.render([red,blue], master); const changed = pixel(3);
+    Object.assign(red.values, defaults(), { opacity: 1 }); r.render([red], master); const reset = pixel(6);
+    const error = r.gl.getError(); r.dispose(); return { sourceOnly, combined, changed, reset, error };
+  });
+  expect(result.sourceOnly.left).toEqual([255,0,0,255]); expect(result.sourceOnly.right).toEqual([0,0,255,255]);
+  expect(result.sourceOnly.draws).toBe(2); expect(result.sourceOnly.textures).toBe(2);
+  expect(result.combined.outside).toEqual([0,0,0,255]); expect(result.combined.left).toEqual([255,0,0,255]); expect(result.combined.right).toEqual([0,0,255,255]); expect(result.combined.draws).toBe(3);
+  expect(result.changed).toEqual([0,0,0,255]); expect(result.reset).toEqual([255,0,0,255]); expect(result.error).toBe(0);
+});
+
+test('source mapping keeps independent bounds through selection and replacement; resets are scoped', async ({ page }, testInfo) => {
+  const errors = []; page.on('pageerror', e => errors.push(e.message));
+  await page.goto('/'); const fixture = await clip(page);
+  await page.locator('#file-input').setInputFiles([fixture, { ...fixture, name: 'second.webm' }]);
+  const first = page.locator('.source-row').first(), second = page.locator('.source-row').nth(1), master = page.locator('.master');
+  const set = async (row, key, value) => { await row.locator('.channel-select').click(); const input = row.locator(`[data-parameter=${key}] input`); await input.fill(String(value)); await input.press('Enter'); };
+  await set(first, 'opacity', 75); await set(first, 'mapX2', 45); await set(first, 'mapY1', 10);
+  await set(second, 'mapX1', 55); await set(master, 'mapY2', 90);
+  await first.locator('.channel-select').click();
+  await expect(first.locator('[data-parameter=mapX2] .knob')).toHaveAttribute('aria-valuenow', '0.45');
+  await expect(first.locator('[data-parameter=mapY1] .knob')).toHaveAttribute('aria-valuenow', '0.1');
+  // Bounds must stay ordered even when a numeric edit would cross the other side.
+  await set(first, 'mapX1', 90); await expect(first.locator('[data-parameter=mapX1] .knob')).toHaveAttribute('aria-valuenow', '0.449');
+  await first.getByRole('button', { name: 'Eject / replace video', exact: true }).click(); await page.locator('#replace-input').setInputFiles({ ...fixture, name: 'mapped-replacement.webm' });
+  await expect(first.locator('[data-parameter=mapY1] .knob')).toHaveAttribute('aria-valuenow', '0.1');
+  await first.locator('.mapping-reset').click();
+  await expect(first.locator('[data-parameter=mapX2] .knob')).toHaveAttribute('aria-valuenow', '1');
+  await expect(first.locator('[data-parameter=opacity] .knob')).toHaveAttribute('aria-valuenow', '0.75');
+  await expect(second.locator('[data-parameter=mapX1] .knob')).toHaveAttribute('aria-valuenow', '0.55');
+  await expect(master.locator('[data-parameter=mapY2] .knob')).toHaveAttribute('aria-valuenow', '0.9');
+  await set(first, 'mapX1', 5); await first.getByRole('button', { name: 'Reset source effects', exact: true }).click();
+  await expect(first.locator('[data-parameter=mapX1] .knob')).toHaveAttribute('aria-valuenow', '0');
+  await page.screenshot({ path: testInfo.outputPath('channel-mapping.png'), fullPage: true });
+  await page.locator('#reset-all').click();
+  await expect(second.locator('[data-parameter=mapX1] .knob')).toHaveAttribute('aria-valuenow', '0');
+  await expect(master.locator('[data-parameter=mapY2] .knob')).toHaveAttribute('aria-valuenow', '1');
+  expect(errors).toEqual([]);
+});
+
+test('mapping render benchmark at 1080p with three sources', async ({ page }, testInfo) => {
+  await page.goto('/');
+  const report = await page.evaluate(async () => {
+    const { Renderer } = await import('/src/renderer.js'), { defaults } = await import('/src/parameters.js');
+    const output = document.createElement('canvas'); output.width = 1920; output.height = 1080;
+    const r = new Renderer(output), master = defaults(true);
+    const sources = ['red','green','blue'].map((color, i) => {
+      const c = document.createElement('canvas'); c.width = 640; c.height = 360;
+      const ctx = c.getContext('2d'); const gradient = ctx.createLinearGradient(0,0,640,360); gradient.addColorStop(0,color); gradient.addColorStop(1,'white'); ctx.fillStyle = gradient; ctx.fillRect(0,0,640,360);
+      Object.defineProperties(c, { videoWidth: { value: 640 }, videoHeight: { value: 360 }, readyState: { value: 4 } });
+      return { id: String(i), video: c, values: { ...defaults(), opacity: .5 }, dirty: true };
+    });
+    const pixel = new Uint8Array(4);
+    function completedFrame(params) {
+      r.render(sources, params);
+      // Read back one pixel to force actual completion, including in offscreen software GL.
+      r.gl.readPixels(960,540,1,1,r.gl.RGBA,r.gl.UNSIGNED_BYTE,pixel);
+    }
+    function measure(params) {
+      for (let i = 0; i < 3; i++) { completedFrame(params); }
+      const times = [];
+      for (let i = 0; i < 8; i++) { const start = performance.now(); completedFrame(params); times.push(performance.now() - start); }
+      times.sort((a,b) => a-b); return Math.round((times[3] + times[4]) / 2 * 100) / 100;
+    }
+    const baselineMs = measure(master);
+    sources.forEach(source => Object.assign(source.values, { mapX1: .01, mapX2: .99, mapY1: .01, mapY2: .99 }));
+    const sourceMappingMs = measure(master);
+    const sourceAndMasterMappingMs = measure({ ...master, mapX1: .01, mapX2: .99, mapY1: .01, mapY2: .99 });
+    const renderedPixel = [...pixel]; r.dispose(); return { baselineMs, sourceMappingMs, sourceAndMasterMappingMs, renderedPixel, note: 'Median synchronized render and one-pixel readback time, 3 static 640x360 textures at 1920x1080 on software Chromium. Excludes decoding/upload and is not an end-to-end FPS estimate. Synchronous readback is used in this benchmark only.' };
+  });
+  console.log('Mapping performance:', JSON.stringify(report));
+  await testInfo.attach('mapping-performance', { body: JSON.stringify(report, null, 2), contentType: 'application/json' });
+  expect([report.baselineMs, report.sourceMappingMs, report.sourceAndMasterMappingMs].every(n => Number.isFinite(n) && n > 0)).toBe(true);
+  expect(report.renderedPixel.slice(0,3).some(n => n > 0)).toBe(true);
 });

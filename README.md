@@ -22,7 +22,7 @@ Open **http://localhost:5173**. No installation is needed to run the mixer. The 
 - Pause playback with the controls beside each source. The eject icon opens the replacement file picker; cancelling keeps the current clip. Clicking the filename selects its channel; use eject to replace its clip. Replacements retain that row’s effects and preview preference. The × button removes a source. Screen blending is independent of source order. Videos are muted.
 - Source previews start **off**. A centered eye button in each monitor tile reveals the existing video element, without opening another decoder. Turning the eye off avoids painting that preview; active clips still need decoding for the mix.
 - The **MASTER** row uses the same centered eye toggle as each source. Its pause button pauses all sources together and resumes only the ones that were playing. Its eye hides the large output monitor while preserving clean output. With that monitor hidden and no output window open, compositing stops until needed again.
-- The global **RESET** restores every source and master effect, hides mapping handles, and restores all four corners. Each source’s **RESET** only resets that source’s effects (including opacity to zero); the master’s **RESET** only resets the master. Loaded clips and their transport settings are retained.
+- The global **RESET** restores every source and master effect and all channel mapping bounds. Each source’s **RESET** resets that source’s effects and mapping (including opacity to zero); the master’s **RESET** resets only the master effects and mapping. Loaded clips and their transport settings are retained.
 - **Open clean output** opens a separate picture-only window. Move it to another monitor and use its fullscreen button or double-click the picture. Allow local pop-ups if the browser blocks it. Keep the mixer open while using the output window.
 
 The dashboard uses a locally bundled **BigBlueTermPlus Nerd Font Mono** font by VileR, patched by Nerd Fonts. It needs no system font installation or network access at runtime. Font attribution and licenses are in [assets/fonts/README.md](assets/fonts/README.md). Thin dark-red table borders and a faint red grid accent the grayscale controls; knob, button and monitor outlines stay gray.
@@ -65,13 +65,18 @@ Clips retain their aspect ratio and fit within the canvas. Empty areas are trans
 
 EDGE compares luminance at the center and two neighboring positions after spatial and color effects, in the existing shader pass. AMOUNT blends between the original image (0%) and bright contours on black (100%); THRESHOLD suppresses weaker differences, and WIDTH changes the neighbor spacing in output pixels before mapping. Source opacity and screen blending still apply. All three controls work on sources and MASTER and participate in resets. The disabled shader variant omits neighbor reads entirely, even if threshold or width has been changed. Enabled EDGE uses three image samples, or nine when combined with RGB SHIFT on the same channel; lower the output resolution if that combination is slow on software WebGL. A short headless Chromium/SwiftShader check with two 640×360 VP8 clips measured 28 fps without EDGE, 17–22 fps with EDGE on the first source at 720p, 11 fps with EDGE plus RGB SHIFT, and 29–30 fps for that combination at 360p. These are local samples, not a guaranteed frame rate.
 
-## Output mapping
+## Per-channel mapping
 
-Enable **MAPPING** below the monitor to reveal four corner handles. Drag them to perspective-warp the combined image; both the monitor and clean output show the result. Handles and the outline are editing guides and never appear in clean output.
+Every source and MASTER has a **🗺️ MAPPING** group in its table, with four coordinate knobs:
 
-Use arrow keys on a focused handle to move it by 1%, or Shift+arrows for 0.1%. Double-click a handle to restore that corner. The mapping **RESET** restores all four corners. Unchecking **MAPPING** only hides the handles and outline; the warp remains applied to the monitor and clean output. Mapping reset remains available while handles are hidden.
+- **X1 / X2**: left and right edges, as percentages of output width.
+- **Y1 / Y2**: top and bottom edges, as percentages of output height, measured from the top.
 
-This is a perspective corner-pin of a flat image, providing skew and apparent depth rather than a separate 3D scene. Corners remain within the output and cannot cross or collapse the image. Black fills areas outside the mapped quadrilateral. A changed mapping adds a final shader pass when the master is otherwise neutral; the default rectangle skips that pass.
+The full-frame default is X1=0%, X2=100%, Y1=0%, Y2=100%. These bounds place and resize the processed image within a rectangle; they do not crop it or independently skew four corners. The separate ROTATE control rotates the image. Bounds cannot cross or collapse, retaining at least a 0.1% gap. Drag, type percentages, or use the usual knob keyboard controls.
+
+Each source is mapped before screen blending. Empty areas reveal the other sources beneath it. MASTER maps the final mix, so empty areas are black. MAPPING’s own **RESET** restores only that channel’s four bounds and preserves its other effects. Source/master RESET includes that channel’s mapping; global RESET restores all mappings. Replacing a clip retains its mapping. Switching channels retains all coordinate values.
+
+Mapping uses a cached affine matrix in the existing source shader pass, with no new source textures, decoders or draw passes. Default bounds skip the mapping calculation. Master mapping uses the existing final master pass; if the master was otherwise neutral, changing its bounds adds that final pass. Mapping controls have no extra live video previews or editing overlay. A local software-WebGL benchmark with three static 640×360 textures at 1080p measured median render plus synchronized readback times of 60.55 ms without mapping, 63.65 ms with source mapping, and 88.30 ms with source and master mapping. This isolates rendering and readback; it excludes decoding and is not an end-to-end FPS estimate or a prediction for a discrete GPU.
 
 ## Performance
 
@@ -97,7 +102,7 @@ npx playwright install chromium
 npm run test:browser
 ```
 
-Browser tests use Chromium’s software WebGL renderer to exercise shader pixels, opacity blending, clone orientation, perspective mapping and reset isolation, color effects, context recovery, multiple-source loading and layout, controls, transport, replacement/removal, preview toggles, master pause/resume, replacement through eject, clean output, fullscreen motion with suspended mixer clocks, screen blending at full opacity, hidden mapping guides, invalid files, and mobile overflow. The benchmark uses two generated 1080p VP8 clips; results are printed and attached in `test-results/`.
+Browser tests use Chromium’s software WebGL renderer to exercise shader pixels, opacity blending, clone orientation, perspective mapping and reset isolation, color effects, context recovery, multiple-source loading and layout, controls, transport, replacement/removal, preview toggles, master pause/resume, replacement through eject, clean output, fullscreen motion with suspended mixer clocks, screen blending at full opacity, per-channel mapping bounds and reset isolation, invalid files, and mobile overflow. The benchmark uses two generated 1080p VP8 clips; results are printed and attached in `test-results/`.
 
 On NixOS, use an installed Nix Chromium instead of Playwright’s downloaded binary:
 

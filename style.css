@@ -119,12 +119,6 @@ main { display: grid; grid-template-columns: minmax(0, 4fr) minmax(200px, 1fr); 
 .monitor-shell { background: #070707; border: 1px solid var(--edge); }
 .mapping-surface { position: relative; width: 100%; aspect-ratio: 16/9; }
 #output { width: 100%; height: 100%; display: block; }
-.mapping-overlay { position: absolute; inset: 0; pointer-events: none; }
-.mapping-overlay svg { position: absolute; inset: 0; width: 100%; height: 100%; overflow: visible; }
-.mapping-overlay polygon { fill: none; stroke: var(--accent); stroke-width: 1; vector-effect: non-scaling-stroke; stroke-dasharray: 4 4; }
-.mapping-handle { position: absolute; left: var(--x); top: var(--y); transform: translate(-50%, -50%); width: 22px; height: 22px; padding: 0; border: 0; background: transparent; cursor: move; touch-action: none; pointer-events: auto; }
-.mapping-handle::after { content: ''; position: absolute; inset: 6px; background: #e9e6dd; border: 1px solid var(--well); box-shadow: 0 0 0 1px var(--subtle); }
-.mapping-handle:hover::after, .mapping-handle:focus-visible::after { background: var(--highlight); box-shadow: 0 0 0 2px var(--highlight); }
 .output-panel { display: flex; flex-direction: column; gap: 14px; margin-top: 16px; }
 .mapping-settings { display: flex; align-items: center; justify-content: space-between; font-size: 9px; color: var(--subtle); }
 .mapping-settings label { display: flex; align-items: center; gap: 6px; cursor: pointer; }
@@ -231,3 +225,8 @@ main { grid-template-columns: minmax(0, 4fr) minmax(175px, 1fr); gap: 16px; padd
 
 .theme-settings label { display: flex; align-items: center; justify-content: space-between; gap: 8px; color: var(--muted); font-size: 9px; }
 .theme-settings select { min-width: 105px; }
+.group-mapping { grid-column: 1 / -1; }
+.group-mapping .effect-knobs { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+.group-mapping h2 { position: relative; }
+.mapping-reset { position: absolute; right: 8px; padding: 4px 6px; font-size: 8px; }
+@media (max-width: 600px) { .group-mapping .effect-knobs { grid-template-columns: repeat(2, minmax(0, 1fr)); } }

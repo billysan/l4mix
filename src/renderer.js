@@ -60,11 +60,11 @@ float luminanceAt(vec2 p) {
 }
 void main() {
   vec2 p = uv;
-  if (master && mappingEnabled) {
+  if (mappingEnabled) {
     vec3 projected = mappingMatrix * vec3(uv.x, 1. - uv.y, 1.);
-    if (abs(projected.z) < .00001) { color = vec4(0., 0., 0., 1.); return; }
+    if (abs(projected.z) < .00001) { color = master ? vec4(0., 0., 0., 1.) : vec4(0.); return; }
     vec2 original = projected.xy / projected.z;
-    if (any(lessThan(original, vec2(0.))) || any(greaterThan(original, vec2(1.)))) { color = vec4(0., 0., 0., 1.); return; }
+    if (any(lessThan(original, vec2(0.))) || any(greaterThan(original, vec2(1.)))) { color = master ? vec4(0., 0., 0., 1.) : vec4(0.); return; }
     p = vec2(original.x, 1. - original.y);
   }
   p -= vec2(slide.x, -slide.y);
@@ -120,7 +120,7 @@ export class Renderer {
     this.buffer = gl.createBuffer(); gl.bindBuffer(gl.ARRAY_BUFFER, this.buffer);
     gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([-1, -1, 3, -1, -1, 3]), gl.STATIC_DRAW);
     const location = gl.getAttribLocation(this.program, 'position'); gl.enableVertexAttribArray(location); gl.vertexAttribPointer(location, 2, gl.FLOAT, false, 0, 0);
-    this.mappingCache = null; this.colorCache = new WeakMap(); this.uploadCanvases = new Map(); this.uploadedTimes = new Map(); this.textures = new Map(); this.target = this.makeTexture(); this.framebuffer = gl.createFramebuffer();
+    this.mappingCache = new WeakMap(); this.colorCache = new WeakMap(); this.uploadCanvases = new Map(); this.uploadedTimes = new Map(); this.textures = new Map(); this.target = this.makeTexture(); this.framebuffer = gl.createFramebuffer();
     this.resize(this.canvas.width, this.canvas.height);
   }
   makeTexture() {
@@ -141,14 +141,15 @@ export class Renderer {
     gl.bindFramebuffer(gl.FRAMEBUFFER, null);
   }
   remove(id) { const texture = this.textures.get(id); if (texture && !this.lost) this.gl.deleteTexture(texture); this.textures.delete(id); this.uploadCanvases.delete(id); this.uploadedTimes.delete(id); }
-  draw(texture, size, values, master = false) {
+  draw(texture, size, values, master = false, mapping = null) {
     const gl = this.gl;
     const split = ['redX', 'redY', 'greenX', 'greenY', 'blueX', 'blueY'].some(key => values[key]);
     const variant = this.variants[(values.edgeAmount > 0 ? 2 : 0) + (split ? 1 : 0)]; this.program = variant.program; this.uniforms = variant.uniforms;
     gl.useProgram(this.program); gl.uniform1i(this.uniforms.image, 0);
     gl.uniform2f(this.uniforms.outputSize, this.canvas.width, this.canvas.height);
-    gl.uniform1i(this.uniforms.mappingEnabled, this.frameMapping ? 1 : 0);
-    if (this.frameMapping) gl.uniformMatrix3fv(this.uniforms.mappingMatrix, false, this.frameMapping);
+    const mappingMatrix = this.mappingTransform(mapping, values);
+    gl.uniform1i(this.uniforms.mappingEnabled, mappingMatrix ? 1 : 0);
+    if (mappingMatrix) gl.uniformMatrix3fv(this.uniforms.mappingMatrix, false, mappingMatrix);
     gl.bindTexture(gl.TEXTURE_2D, texture);
     gl.uniform2f(this.uniforms.sourceSize, ...size); gl.uniform1i(this.uniforms.master, master ? 1 : 0);
     for (const [key, value] of Object.entries(values)) if (this.uniforms[key] != null) gl.uniform1f(this.uniforms[key], value);
@@ -183,21 +184,38 @@ export class Renderer {
     }
     const result = { signature, matrix, offset }; this.colorCache.set(v, result); return result;
   }
+  mappingTransform(mapping, values = null) {
+    if (mapping?.points && !identityCorners(mapping.points)) {
+      const signature = mapping.points.flat().join(',');
+      let cached = this.mappingCache.get(mapping);
+      if (cached?.signature !== signature) {
+        cached = { signature, matrix: inverseMapping(mapping.points) }; this.mappingCache.set(mapping, cached);
+      }
+      return cached.matrix;
+    }
+    if (!values) return null;
+    const x1 = values.mapX1 ?? 0, x2 = values.mapX2 ?? 1, y1 = values.mapY1 ?? 0, y2 = values.mapY2 ?? 1;
+    if (x1 === 0 && x2 === 1 && y1 === 0 && y2 === 1) return null;
+    const width = x2 - x1, height = y2 - y1;
+    if (!(width > 0 && height > 0)) return null;
+    const signature = [x1, x2, y1, y2].join(',');
+    let cached = this.mappingCache.get(values);
+    if (cached?.signature !== signature) {
+      // Axis-aligned bounds only require an affine matrix; cache it until a knob changes.
+      cached = { signature, matrix: new Float32Array([1 / width, 0, 0, 0, 1 / height, 0, -x1 / width, -y1 / height, 1]) };
+      this.mappingCache.set(values, cached);
+    }
+    return cached.matrix;
+  }
   isNeutral(v) {
-    return v.opacity === 1 && !v.edgeAmount && v.inversion === 0 && v.brightness === 0 && v.contrast === 1 && v.saturation === 1 && v.red === 1 && v.green === 1 && v.blue === 1 && v.mirrorX === 1 && v.mirrorY === 1 && v.hue === 0 && v.pixelation === 1 && !(v.rotation % 360) && ['slideX', 'slideY', 'redX', 'redY', 'greenX', 'greenY', 'blueX', 'blueY'].every(key => !v[key]);
+    return !(v.mapX1 || v.mapY1) && (v.mapX2 ?? 1) === 1 && (v.mapY2 ?? 1) === 1 && v.opacity === 1 && !v.edgeAmount && v.inversion === 0 && v.brightness === 0 && v.contrast === 1 && v.saturation === 1 && v.red === 1 && v.green === 1 && v.blue === 1 && v.mirrorX === 1 && v.mirrorY === 1 && v.hue === 0 && v.pixelation === 1 && !(v.rotation % 360) && ['slideX', 'slideY', 'redX', 'redY', 'greenX', 'greenY', 'blueX', 'blueY'].every(key => !v[key]);
   }
   render(sources, master, mapping = null) {
     if (this.lost) return false;
     const gl = this.gl, { width, height } = this.canvas;
     gl.useProgram(this.program); gl.bindVertexArray(this.vao); gl.activeTexture(gl.TEXTURE0); gl.uniform1i(this.uniforms.image, 0);
     gl.viewport(0, 0, width, height); gl.uniform2f(this.uniforms.outputSize, width, height);
-    let transform = null;
-    if (mapping?.points && !identityCorners(mapping.points)) {
-      const signature = mapping.points.flat().join(',');
-      if (this.mappingCache?.signature !== signature) this.mappingCache = { signature, matrix: inverseMapping(mapping.points) };
-      transform = this.mappingCache.matrix;
-    }
-    this.frameMapping = transform;
+    const transform = this.mappingTransform(mapping, master);
     const direct = this.isNeutral(master) && !transform;
     gl.bindFramebuffer(gl.FRAMEBUFFER, direct ? null : this.framebuffer); gl.clearColor(0, 0, 0, 1); gl.clear(gl.COLOR_BUFFER_BIT);
     // Screen blend: C = source * opacity + destination * (1 - source * opacity).
@@ -227,10 +245,10 @@ export class Renderer {
         }
         catch (error) { source.onRenderError?.(error); continue; }
       }
-      this.draw(texture, [source.video.videoWidth, source.video.videoHeight], source.values);
+      this.draw(texture, [source.video.videoWidth, source.video.videoHeight], source.values, false, source.mapping);
     }
     gl.disable(gl.BLEND); gl.bindFramebuffer(gl.FRAMEBUFFER, null);
-    if (!direct) this.draw(this.target, [width, height], master, true);
+    if (!direct) this.draw(this.target, [width, height], master, true, mapping);
     return true;
   }
   dispose() {

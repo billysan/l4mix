@@ -1,13 +1,11 @@
 import { PARAMETERS, defaults, clampParameter, formatParameter } from './parameters.js';
 import { Renderer } from './renderer.js';
-import { defaultCorners, validCorners, identityCorners } from './mapping.js';
 import { SourceTransport } from './transport.js';
 import { icon } from './icons.js';
 import { controlNavigation } from './navigation.js';
 
 const $ = selector => document.querySelector(selector);
 const sources = [];
-const mapping = { editing: false, points: defaultCorners() };
 const master = { id: 'master', values: defaults(true), controls: new Map(), paused: false, preview: true };
 let renderer, nextId = 1, replacementId = null, outputWindow = null, outputStream = null;
 let renderDirty = true, lastRender = -Infinity, lastStats = performance.now(), frames = 0, disposed = false;
@@ -48,7 +46,7 @@ function knob(parameter, owner) {
     control.setAttribute('aria-valuenow', value); control.setAttribute('aria-valuetext', formatParameter(parameter, value));
     if (document.activeElement !== input) input.value = formatParameter(parameter, value);
   };
-  const set = value => { owner.values[parameter.key] = clampParameter(parameter, value); update(); renderDirty = true; updateMonitor(); };
+  const set = value => { owner.values[parameter.key] = clampParameter(parameter, value, owner.values); update(); renderDirty = true; updateMonitor(); };
   owner.controls.set(parameter.key, update);
   let drag = null;
   control.addEventListener('pointerdown', e => {
@@ -95,13 +93,22 @@ const EFFECT_GROUPS = [
   ['RGB SHIFT', ['redX', 'redY', 'greenX', 'greenY', 'blueX', 'blueY'], '🧲 RGB SHIFT'],
   ['SLIDE', ['slideX', 'slideY', 'rotation'], '🎡 SLIDE'],
   ['EDGE', ['edgeAmount', 'edgeThreshold', 'edgeWidth'], '⚡ EDGE'],
+  ['MAPPING', ['mapX1', 'mapX2', 'mapY1', 'mapY2'], '🗺️ MAPPING'],
 ];
 function effectPanel(owner) {
   const panel = document.createElement('div'); panel.className = 'channel-effects'; owner.panel = panel;
   panel.setAttribute('aria-label', owner.id === 'master' ? 'Master effects' : `Source ${owner.number} effects`);
   for (const [name, keys, title = name] of EFFECT_GROUPS) {
     const group = document.createElement('section'); group.className = `effect-group group-${name.toLowerCase().replaceAll(' ', '-')}`;
-    const heading = document.createElement('h2'); heading.textContent = title; group.append(heading);
+    const heading = document.createElement('h2'); heading.textContent = title;
+    if (name === 'MAPPING') {
+      const button = sourceButton('RESET', `Reset ${owner.id === 'master' ? 'master' : 'source'} mapping`, () => {
+        for (const key of keys) { owner.values[key] = PARAMETERS.find(p => p.key === key).initial; owner.controls.get(key)?.(); }
+        renderDirty = true;
+      });
+      button.className = 'reset-button mapping-reset'; heading.append(button);
+    }
+    group.append(heading);
     const grid = document.createElement('div'); grid.className = 'effect-knobs';
     for (const key of keys) grid.append(knob(PARAMETERS.find(p => p.key === key), owner));
     group.append(grid); panel.append(group);
@@ -130,7 +137,7 @@ const masterRow = document.createElement('div'); masterRow.className = 'matrix-r
 const masterLabel = document.createElement('div'); masterLabel.className = 'source-cell';
 const masterThumb = document.createElement('div'); masterThumb.className = 'thumbnail master-thumbnail';
 const masterEye = iconButton('eye', 'Master monitor', () => {
-  master.preview = !master.preview; updateMaster(); updateMapping(); renderDirty = true;
+  master.preview = !master.preview; updateMaster(); renderDirty = true;
 });
 masterEye.classList.add('preview-eye'); masterThumb.append(masterEye);
 const masterDetails = document.createElement('div'); masterDetails.className = 'source-details';
@@ -168,7 +175,7 @@ function setSignal(active, title = '') {
 
 function reset(owner) {
   Object.assign(owner.values, defaults(owner.id === 'master'));
-  owner.controls.forEach(update => update()); renderDirty = true; updateMonitor();
+  owner.controls.forEach(update => update()); renderDirty = true; updateMonitor(); navigation.refresh();
 }
 function updateMonitor() {
   if (!renderer) return;
@@ -300,7 +307,7 @@ window.addEventListener('dragover', e => { if (e.dataTransfer.types.includes('Fi
 window.addEventListener('dragenter', e => { if (e.dataTransfer.types.includes('Files')) { e.preventDefault(); dragDepth++; $('#drop-zone').classList.add('drag-over'); } });
 window.addEventListener('dragleave', () => { dragDepth = Math.max(0, dragDepth - 1); if (!dragDepth) $('#drop-zone').classList.remove('drag-over'); });
 window.addEventListener('drop', e => { e.preventDefault(); dragDepth = 0; $('#drop-zone').classList.remove('drag-over'); if (e.dataTransfer.files.length) addFiles(e.dataTransfer.files); });
-$('#reset-all').onclick = () => { sources.forEach(reset); reset(master); mapping.editing = false; $('#mapping-toggle').checked = false; resetMapping(); };
+$('#reset-all').onclick = () => { sources.forEach(reset); reset(master); };
 $('#resolution').onchange = e => {
   if (!renderer) return;
   const h = Number(e.target.value);
@@ -336,7 +343,7 @@ function renderFrame(now, fromOutput = false) {
   if (renderer && (master.preview || (outputWindow && !outputWindow.closed)) && (renderDirty || playing || sources.some(s => s.dirty && s.values.opacity > 0))) {
     try {
       const started = performance.now();
-      if (renderer.render(sources, master.values, mapping)) {
+      if (renderer.render(sources, master.values)) {
         renderTime += performance.now() - started;
         renderDirty = false; frames++;
         // Explicit capture also works when the mixer canvas is covered by fullscreen output.
@@ -379,47 +386,4 @@ window.addEventListener('mist-output-frame', e => {
 window.addEventListener('pagehide', () => {
   disposed = true; sources.forEach(disposeSource); stopOutputStream(); renderer?.dispose(); if (outputWindow && !outputWindow.closed) outputWindow.close();
 });
-const handles = [...document.querySelectorAll('.mapping-handle')];
-function updateMapping() {
-  $('#mapping-overlay').hidden = !mapping.editing || !master.preview;
-  $('#reset-mapping').disabled = identityCorners(mapping.points);
-  mapping.points.forEach(([x, y], i) => {
-    handles[i].style.setProperty('--x', `${x * 100}%`);
-    handles[i].style.setProperty('--y', `${y * 100}%`);
-    handles[i].setAttribute('aria-description', `${Math.round(x * 100)}% horizontal, ${Math.round(y * 100)}% vertical. Use arrow keys to move.`);
-  });
-  $('#mapping-outline').setAttribute('points', mapping.points.map(([x, y]) => `${x * 100},${y * 100}`).join(' '));
-  renderDirty = true;
-}
-function resetMapping() { mapping.points = defaultCorners(); updateMapping(); }
-function moveCorner(index, x, y) {
-  const points = mapping.points.map(p => [...p]);
-  points[index] = [Math.min(1, Math.max(0, x)), Math.min(1, Math.max(0, y))];
-  if (!validCorners(points)) return;
-  mapping.points = points; updateMapping();
-}
-$('#mapping-toggle').onchange = e => { mapping.editing = e.target.checked; updateMapping(); };
-$('#reset-mapping').onclick = resetMapping;
-handles.forEach((handle, index) => {
-  let dragging = false;
-  handle.addEventListener('pointerdown', e => {
-    if (e.button !== 0) return;
-    e.preventDefault(); handle.focus(); handle.setPointerCapture(e.pointerId); dragging = true;
-  });
-  handle.addEventListener('pointermove', e => {
-    if (!dragging || !mapping.editing) return;
-    const bounds = $('#mapping-surface').getBoundingClientRect();
-    moveCorner(index, (e.clientX - bounds.left) / bounds.width, (e.clientY - bounds.top) / bounds.height);
-  });
-  const end = () => { dragging = false; };
-  handle.addEventListener('pointerup', end); handle.addEventListener('lostpointercapture', end);
-  handle.addEventListener('dblclick', () => { const [x, y] = defaultCorners()[index]; moveCorner(index, x, y); });
-  handle.addEventListener('keydown', e => {
-    const direction = { ArrowLeft: [-1, 0], ArrowRight: [1, 0], ArrowUp: [0, -1], ArrowDown: [0, 1] }[e.key];
-    if (direction) {
-      e.preventDefault(); const step = e.shiftKey ? .001 : .01;
-      moveCorner(index, mapping.points[index][0] + direction[0] * step, mapping.points[index][1] + direction[1] * step);
-    }
-  });
-});
-updateMaster(); updateMapping(); updateRows(); requestAnimationFrame(tick);
+updateMaster(); updateRows(); requestAnimationFrame(tick);
