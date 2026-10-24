@@ -184,15 +184,15 @@ main { grid-template-columns: minmax(0, 4fr) minmax(175px, 1fr); gap: 16px; padd
 .channel-selected .source-cell { background: var(--selected-panel); box-shadow: inset 3px 0 var(--selected-line); }
 .channel-select { display: block; border: 0; padding: 0; background: none; width: 100%; text-align: left; color: var(--text); font-size: 10px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .channel-select[aria-pressed=true] { color: var(--highlight); }
-.channel-effects { grid-column: 2; grid-row: 1 / span var(--workspace-rows, 3); display: grid; grid-template-columns: minmax(75px, .7fr) minmax(0, 2fr); gap: 12px; align-content: start; }
+.channel-effects { grid-column: 2; grid-row: 1 / span var(--workspace-rows, 3); display: grid; grid-template-columns: minmax(75px, .7fr) minmax(0, 2fr); gap: 8px; align-content: start; }
 .effect-group { border: 1px solid var(--line); background: var(--panel); min-width: 0; }
-.effect-group h2 { height: 29px; display: flex; align-items: center; justify-content: center; text-align: center; padding: 0 4px; margin: 0; font: 10px var(--font); letter-spacing: 1px; color: var(--text); background: var(--header); border-bottom: 1px solid var(--line); }
-.effect-knobs { display: grid; grid-template-columns: repeat(auto-fit, minmax(63px, 1fr)); padding: 12px 6px; row-gap: 12px; }
+.effect-group h2 { height: 24px; display: flex; align-items: center; justify-content: center; text-align: center; padding: 0 4px; margin: 0; font: 10px var(--font); letter-spacing: 1px; color: var(--text); background: var(--header); border-bottom: 1px solid var(--line); }
+.effect-knobs { display: grid; grid-template-columns: repeat(auto-fit, minmax(63px, 1fr)); padding: 6px; row-gap: 8px; }
 .group-opacity { grid-column: 1; }
 .group-rgb { grid-column: 2; }
 .group-colors, .group-effects { grid-column: 1 / -1; }
 .group-colors .effect-knobs, .group-effects .effect-knobs { grid-template-columns: repeat(4, minmax(0, 1fr)); }
-.knob-cell { padding: 9px 0; gap: 13px; min-width: 0; border: 0; background-image: linear-gradient(var(--grid) 1px, transparent 1px), linear-gradient(90deg, var(--grid) 1px, transparent 1px); background-size: 16px 16px; }
+.knob-cell { padding: 4px 0; gap: 7px; min-width: 0; border: 0; background-image: linear-gradient(var(--grid) 1px, transparent 1px), linear-gradient(90deg, var(--grid) 1px, transparent 1px); background-size: 16px 16px; }
 .knob-cell.mix { border: 0; }
 .parameter-label { display: block; height: auto; border: 0; font-size: 9px; }
 .knob { width: 38px; height: 38px; }
@@ -222,6 +222,11 @@ main { grid-template-columns: minmax(0, 4fr) minmax(175px, 1fr); gap: 16px; padd
 
 .group-edge { grid-column: 1 / -1; }
 .group-edge .effect-knobs { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+@media (min-width: 1400px) {
+  .channel-effects { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+  .group-rgb { grid-column: 2 / -1; }
+  .group-slide, .group-edge { grid-column: span 2; }
+}
 
 .theme-settings label { display: flex; align-items: center; justify-content: space-between; gap: 8px; color: var(--muted); font-size: 9px; }
 .theme-settings select { min-width: 105px; }
