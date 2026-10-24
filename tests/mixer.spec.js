@@ -387,7 +387,7 @@ test('selected channel workspace groups effects and retains each channel state',
   await expect(page.locator('#channel-title')).toHaveCount(0);
   const panelBounds = await first.locator('.channel-effects').boundingBox(), monitorBounds = await page.locator('.monitor-section').boundingBox(), listBounds = await page.locator('.source-column-label').boundingBox();
   expect(panelBounds.y).toBeCloseTo(monitorBounds.y, 0); expect(panelBounds.y).toBeCloseTo(listBounds.y, 0);
-  await expect(first.locator('.effect-group h2')).toHaveText(['👻 OPACITY', '🔴🟢🔵 RGB', '🎨 COLORS', '🧪 FX', '🧲 RGB SHIFT', '🎡 SLIDE', '⚡ EDGE', /🗺️ MAPPING/]);
+  await expect(first.locator('.effect-group h2')).toHaveText(['👻 OPACITY', '🔴🟢🔵 RGB', '🎨 COLORS', '🧪 FX', '🪞 MIRROR', '🧲 RGB SHIFT', '🎡 SLIDE', '⚡ EDGE', /🗺️ MAPPING/]);
   await setValue(first, 0, 65); await setValue(first, 3, 1.2);
   await setValue(second, 0, 35); await setValue(second, 10, 30);
   await first.locator('.channel-select').click();

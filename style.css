@@ -187,16 +187,17 @@ main { grid-template-columns: minmax(0, 4fr) minmax(175px, 1fr); gap: 16px; padd
 .channel-effects { grid-column: 2; grid-row: 1 / span var(--workspace-rows, 3); display: grid; grid-template-columns: minmax(75px, .7fr) minmax(0, 2fr); gap: 8px; align-content: start; }
 .effect-group { border: 1px solid var(--line); background: var(--panel); min-width: 0; }
 .effect-group h2 { height: 24px; display: flex; align-items: center; justify-content: center; text-align: center; padding: 0 4px; margin: 0; font: 10px var(--font); letter-spacing: 1px; color: var(--text); background: var(--header); border-bottom: 1px solid var(--line); }
-.effect-knobs { display: grid; grid-template-columns: repeat(auto-fit, minmax(63px, 1fr)); padding: 6px; row-gap: 8px; }
+.effect-knobs { display: grid; grid-template-columns: repeat(auto-fit, minmax(76px, 1fr)); padding: 8px 6px 2px; row-gap: 6px; }
 .group-opacity { grid-column: 1; }
 .group-rgb { grid-column: 2; }
-.group-colors, .group-effects { grid-column: 1 / -1; }
-.group-colors .effect-knobs, .group-effects .effect-knobs { grid-template-columns: repeat(4, minmax(0, 1fr)); }
-.knob-cell { padding: 4px 0; gap: 7px; min-width: 0; border: 0; background-image: linear-gradient(var(--grid) 1px, transparent 1px), linear-gradient(90deg, var(--grid) 1px, transparent 1px); background-size: 16px 16px; }
+.group-colors, .group-effects, .group-mirror { grid-column: 1 / -1; }
+.group-colors .effect-knobs { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+.group-effects .effect-knobs, .group-mirror .effect-knobs { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+.knob-cell { display: grid; grid-template-columns: auto 50px; grid-template-rows: 38px auto; justify-content: center; align-items: center; padding: 2px 0 0; gap: 2px 6px; min-width: 0; border: 0; background-image: linear-gradient(var(--grid) 1px, transparent 1px), linear-gradient(90deg, var(--grid) 1px, transparent 1px); background-size: 16px 16px; }
 .knob-cell.mix { border: 0; }
-.parameter-label { display: block; height: auto; border: 0; font-size: 9px; }
-.knob { width: 38px; height: 38px; }
-.knob-value { font-size: 10px; }
+.parameter-label { grid-column: 1; grid-row: 1; justify-self: end; display: block; height: auto; border: 0; font-size: 9px; white-space: nowrap; text-align: right; }
+.knob { grid-column: 2; grid-row: 1; justify-self: center; width: 38px; height: 38px; }
+.knob-value { grid-column: 2; grid-row: 2; padding: 0; font-size: 10px; }
 .matrix .channel-select.control-selected { outline-offset: 2px; }
 @media (max-width: 1000px) {
   main { grid-template-columns: minmax(0, 1fr); }
@@ -212,7 +213,7 @@ main { grid-template-columns: minmax(0, 4fr) minmax(175px, 1fr); gap: 16px; padd
   .group-colors .effect-knobs, .group-effects .effect-knobs { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 }
 .group-rgb-shift, .group-slide { grid-column: 1 / -1; }
-.group-rgb-shift .effect-knobs { grid-template-columns: repeat(6, minmax(0, 1fr)); }
+.group-rgb-shift .effect-knobs { grid-template-columns: repeat(3, minmax(0, 1fr)); }
 .group-slide .effect-knobs { grid-template-columns: repeat(3, minmax(0, 1fr)); }
 @media (max-width: 600px) { .group-rgb-shift .effect-knobs { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
 .system-stats { display: grid; gap: 10px; margin: 0; padding-top: 12px; border-top: 1px solid var(--line); font: 9px var(--font); color: var(--subtle); }
@@ -225,7 +226,8 @@ main { grid-template-columns: minmax(0, 4fr) minmax(175px, 1fr); gap: 16px; padd
 @media (min-width: 1400px) {
   .channel-effects { grid-template-columns: repeat(4, minmax(0, 1fr)); }
   .group-rgb { grid-column: 2 / -1; }
-  .group-slide, .group-edge { grid-column: span 2; }
+  .group-rgb-shift .effect-knobs { grid-template-columns: repeat(6, minmax(0, 1fr)); }
+  .group-effects, .group-mirror, .group-slide, .group-edge { grid-column: span 2; }
 }
 
 .theme-settings label { display: flex; align-items: center; justify-content: space-between; gap: 8px; color: var(--muted); font-size: 9px; }

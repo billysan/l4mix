@@ -30,6 +30,12 @@ try {
   $('#open-output').disabled = true;
 }
 
+const KNOB_LABELS = {
+  opacity: 'OP', inversion: 'INV', brightness: 'BRI', contrast: 'CNT', saturation: 'SAT',
+  red: 'R', green: 'G', blue: 'B', mirrorX: 'X', mirrorY: 'Y', hue: 'HUE', pixelation: 'PIX',
+  edgeAmount: 'AMT', edgeThreshold: 'THR', edgeWidth: 'W', rotation: 'ROT',
+  redX: 'RX', redY: 'RY', greenX: 'GX', greenY: 'GY', blueX: 'BX', blueY: 'BY',
+};
 function knob(parameter, owner) {
   const cell = document.createElement('div'); cell.className = `knob-cell ${parameter.group || ''}`; cell.dataset.parameter = parameter.key;
   const control = document.createElement('div'); control.className = 'knob'; control.tabIndex = 0; control.setAttribute('role', 'slider');
@@ -81,7 +87,7 @@ function knob(parameter, owner) {
     if (e.key === 'Enter') { input.blur(); control.focus(); }
     if (e.key === 'Escape') { input.value = formatParameter(parameter, owner.values[parameter.key]); input.blur(); control.focus(); }
   });
-  const label = document.createElement('span'); label.className = 'parameter-label'; label.textContent = parameter.label;
+  const label = document.createElement('span'); label.className = 'parameter-label'; label.textContent = KNOB_LABELS[parameter.key] || parameter.label; label.title = parameter.label;
   update(); cell.append(label, control, input); return cell;
 }
 
@@ -89,7 +95,8 @@ const EFFECT_GROUPS = [
   ['OPACITY', ['opacity'], '👻 OPACITY'],
   ['RGB', ['red', 'green', 'blue'], '🔴🟢🔵 RGB'],
   ['COLORS', ['brightness', 'contrast', 'saturation', 'hue'], '🎨 COLORS'],
-  ['EFFECTS', ['inversion', 'mirrorX', 'mirrorY', 'pixelation'], '🧪 FX'],
+  ['EFFECTS', ['inversion', 'pixelation'], '🧪 FX'],
+  ['MIRROR', ['mirrorX', 'mirrorY'], '🪞 MIRROR'],
   ['RGB SHIFT', ['redX', 'redY', 'greenX', 'greenY', 'blueX', 'blueY'], '🧲 RGB SHIFT'],
   ['SLIDE', ['slideX', 'slideY', 'rotation'], '🎡 SLIDE'],
   ['EDGE', ['edgeAmount', 'edgeThreshold', 'edgeWidth'], '⚡ EDGE'],
