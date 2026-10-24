@@ -302,6 +302,39 @@ function addFiles(files) {
   if (wasEmpty && sources.length) selectedOwner = sources[0];
   updateRows();
 }
+const downloadDialog = $('#download-dialog');
+let downloadController = null;
+$('#web-add').innerHTML = icon('globe');
+$('#web-add').onclick = () => { downloadDialog.showModal(); $('#download-url').focus(); };
+function closeDownload() { downloadController?.abort(); downloadDialog.close(); }
+$('#download-close').onclick = closeDownload;
+downloadDialog.addEventListener('cancel', () => downloadController?.abort());
+$('#download-form').onsubmit = async event => {
+  event.preventDefault();
+  if (downloadController) return;
+  const controller = downloadController = new AbortController();
+  $('#download-submit').disabled = true;
+  $('#download-url').disabled = true;
+  $('#download-status').textContent = 'Downloading…';
+  try {
+    const response = await fetch('/api/download', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ url: $('#download-url').value.trim() }), signal: controller.signal });
+    const result = await response.json();
+    if (!response.ok) throw new Error(result.error || 'Download failed.');
+    const media = await fetch(result.url, { signal: controller.signal });
+    if (!media.ok) throw new Error('Could not load the downloaded video.');
+    const blob = await media.blob();
+    addFiles([new File([blob], result.name, { type: 'video/mp4' })]);
+    $('#download-url').value = '';
+    $('#download-status').textContent = '';
+    downloadDialog.close();
+  } catch (error) {
+    $('#download-status').textContent = error.name === 'AbortError' ? 'Download cancelled.' : error.message;
+  } finally {
+    downloadController = null;
+    $('#download-submit').disabled = false;
+    $('#download-url').disabled = false;
+  }
+};
 $('#empty-add').onclick = () => $('#file-input').click();
 $('#file-input').onchange = e => { addFiles(e.target.files); e.target.value = ''; };
 $('#replace-input').onchange = e => {

@@ -761,3 +761,27 @@ test('video jump buttons seek five seconds and randomly without changing playbac
   await expect(first.locator('small')).toContainText('PLAYING'); await expect(second.locator('small')).toContainText('PAUSED');
   await page.screenshot({ path: testInfo.outputPath('seek-controls.png'), fullPage: true }); expect(errors).toEqual([]);
 });
+
+test('YouTube dialog loads a downloaded source, reports errors and cancels', async ({ page }) => {
+  await page.goto('/'); const fixture = await clip(page);
+  let fail = true;
+  await page.route('**/api/download', async route => {
+    expect(route.request().postDataJSON().url).toBe('https://youtu.be/q030WNZvXrA');
+    await route.fulfill({ status: fail ? 400 : 200, contentType: 'application/json', body: JSON.stringify(fail ? { error: 'Video unavailable' } : { url: '/media/test.mp4', name: 'Downloaded scene.mp4' }) });
+  });
+  await page.route('**/media/test.mp4', route => route.fulfill({ contentType: 'video/mp4', body: fixture.buffer }));
+  await page.getByRole('button', { name: 'Add YouTube video', exact: true }).click();
+  await expect(page.locator('#download-dialog')).toBeVisible();
+  await expect(page.getByRole('link', { name: 'Search YouTube' })).toHaveAttribute('target', '_blank');
+  await page.locator('#download-url').fill('https://youtu.be/q030WNZvXrA');
+  await page.locator('#download-submit').click();
+  await expect(page.locator('#download-status')).toHaveText('Video unavailable');
+  fail = false; await page.locator('#download-submit').click();
+  await expect(page.locator('#download-dialog')).not.toBeVisible();
+  await expect(page.locator('#source-count')).toHaveText('1');
+  await expect(page.locator('.source-name')).toContainText('Downloaded scene.mp4');
+  await expect(page.locator('.source-row [role=slider]').first()).toHaveAttribute('aria-valuenow', '0');
+  await page.getByRole('button', { name: 'Add YouTube video', exact: true }).click();
+  await page.keyboard.press('Escape');
+  await expect(page.locator('#download-dialog')).not.toBeVisible();
+});

@@ -10,7 +10,13 @@ Requires Node.js 20 or newer and a browser with WebGL2.
 npm start
 ```
 
-Open **http://localhost:5173**. No installation is needed to run the mixer. The server binds to the local machine only; files are opened through browser object URLs and are never uploaded or saved by the app. Close the server with Ctrl+C. Set `PORT` to use a different port.
+Open **http://localhost:5173**. No installation is needed to run the mixer. The server binds to the local machine only; local files are opened through browser object URLs and are never uploaded. YouTube downloads are saved locally in `media/` (ignored by Git). Close the server with Ctrl+C. Set `PORT` to use a different port.
+
+## YouTube sources
+
+Install [yt-dlp](https://github.com/yt-dlp/yt-dlp#installation) on PATH, or start with `YT_DLP=/absolute/path/to/yt-dlp npm start`. Click the globe beside **+**, paste a YouTube video URL, then **DOWNLOAD**. The dialog also links to YouTube search. Downloads are saved in `media/` and loaded as a new source at 0% opacity; saved files remain after removing a source. Local files can be reloaded with **+**.
+
+No FFmpeg is needed: yt-dlp selects a single H.264 MP4 video stream up to 1080p, without merging audio or transcoding. Quality depends on available formats; unavailable formats, private videos, login challenges and live streams report errors in the dialog. Update yt-dlp when YouTube changes. Downloads are limited to 512 MB and five minutes, one at a time. Closing the dialog cancels the active request and cleans temporary files. Downloaded sources follow the same browser playback and codec requirements as local files.
 
 ## Play
 

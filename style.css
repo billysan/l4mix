@@ -235,3 +235,14 @@ main { grid-template-columns: minmax(0, 4fr) minmax(175px, 1fr); gap: 16px; padd
 .seek-button svg { width: 13px; height: 13px; }
 .seek-button:hover:enabled { color: var(--highlight); background: var(--button-hover); }
 .seek-placeholder { visibility: hidden; }
+
+.add-source svg { width: 15px; height: 15px; }
+#download-dialog { width: min(360px, calc(100vw / 1.4 - 40px)); padding: 18px; background: var(--panel); color: var(--text); border: 1px solid var(--edge); border-radius: 3px; }
+#download-dialog::backdrop { background: #000a; }
+.download-heading, .download-actions { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.download-heading { margin-bottom: 16px; }
+.download-heading h2 { font-size: 12px; margin: 0; }
+#download-form label { font-size: 10px; }
+#download-url { box-sizing: border-box; width: 100%; background: var(--input); color: var(--text); border: 1px solid var(--edge); padding: 9px; margin: 6px 0 16px; font-size: 11px; }
+.download-actions a { color: var(--text); font-size: 10px; }
+#download-status { font-size: 10px; line-height: 1.5; overflow-wrap: anywhere; margin-bottom: 0; }

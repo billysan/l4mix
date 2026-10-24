@@ -1,4 +1,5 @@
 const paths = {
+  globe: '<circle cx="12" cy="12" r="9"/><ellipse cx="12" cy="12" rx="4" ry="9"/><path d="M3 12h18M5 6h14M5 18h14"/>',
   play: '<path d="m8 5 11 7-11 7Z"/>',
   pause: '<path d="M8 5v14M16 5v14"/>',
   eye: '<path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12Z"/><circle cx="12" cy="12" r="3"/>',

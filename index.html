@@ -16,7 +16,7 @@
       <input id="replace-input" type="file" accept="video/*,.mkv,.mov,.webm,.mp4,.m4v,.ogv" hidden>
       <div class="matrix-scroll" tabindex="0" aria-label="Sources and selected channel effects">
         <div class="matrix" id="matrix">
-          <div class="matrix-columns" id="column-headings"><div class="source-column-label"><span>SOURCE</span><span id="source-count" class="source-count">0</span><button id="empty-add" class="add-source" aria-label="Add videos" title="Add videos">+</button></div></div>
+          <div class="matrix-columns" id="column-headings"><div class="source-column-label"><span>SOURCE</span><span id="source-count" class="source-count">0</span><button id="empty-add" class="add-source" aria-label="Add videos" title="Add videos">+</button><button id="web-add" class="add-source" aria-label="Add YouTube video" title="Add YouTube video"></button></div></div>
           <div id="source-rows"></div>
           <div id="master-row"></div>
         </div>
@@ -44,6 +44,15 @@
         </dl>
       </div>
     </aside>
+    <dialog id="download-dialog" aria-labelledby="download-title">
+      <form id="download-form">
+        <div class="download-heading"><h2 id="download-title">YOUTUBE SOURCE</h2><button type="button" id="download-close" class="icon-button" aria-label="Close download">×</button></div>
+        <label for="download-url">URL</label>
+        <input id="download-url" type="url" placeholder="https://www.youtube.com/watch?v=…" required autocomplete="off">
+        <div class="download-actions"><a href="https://www.youtube.com/" target="_blank" rel="noopener noreferrer">Search YouTube ↗</a><button id="download-submit" class="button" type="submit">DOWNLOAD</button></div>
+        <p id="download-status" role="status"></p>
+      </form>
+    </dialog>
     <div id="messages" class="messages" aria-live="polite"></div>
   </main>
   <script type="module" src="/src/app.js"></script>
